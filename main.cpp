@@ -39,6 +39,7 @@
 
 using namespace std;
 
+//----==== OK! Tested ====-----
 SDL_Rect render_text_center(SDL_Renderer *renderer, const char *text, SDL_Point *center_point, TTF_Font *font = NULL, SDL_Color color = {0, 0, 0, 255})
 {
     string t = text;
@@ -296,6 +297,7 @@ bool set_best_score(const long score)
     return false;
 }
 
+//-----===== OK! Tested ====-----
 bool draw_image(SDL_Renderer *renderer, SDL_Point top_left_corner, const char *image_address , SDL_Rect * srcrect = NULL , SDL_Rect * dstrect = NULL)
 {
     SDL_Surface *surf = IMG_Load(image_address);
@@ -401,6 +403,10 @@ int end_menu(SDL_Renderer *renderer, SDL_Texture *back_texture, SDL_Rect *bounds
 
     return 1;
 }
+
+
+
+
 
 int main(int argc, char *argv[])
 {
