@@ -50,6 +50,7 @@
 
 #define WIDTH 1200
 #define HEIGHT 800
+#define BOTTOM_MARGIN 100
 
 using namespace std;
 
@@ -144,7 +145,7 @@ typedef enum States
     STATE_GAMING,
     STATE_QUIT
 } States;
-States Game_State = STATE_END_MENU;
+States Game_State = STATE_GAMING;
 
 typedef enum Char_modes
 {
@@ -158,20 +159,22 @@ typedef struct Character
 {
 private:
     Char_modes mode = NORMAL;
+    bool on_jump = false;
     int char_num = 1;
     int current_pic_number = 3;
     string img_addr = string(CHAR_RAW_ROOT) + string("1.png");
     const static int char_pics_count = 4;
 
-    const int x_speed = 30;
+    const int triple_margin = 30;
+    const int x_speed = 50;
     const int y_speed = 50;
     int dx = 0, dy = 0, dvy = -10;
+    int keys[3] = {SDLK_RIGHT, SDLK_LEFT, SDLK_UP};
 
     SDL_Event *event = NULL;
 
     SDL_Rect bounds{0, 0, 0, 0};
     SDL_Texture *back_texture = NULL;
-
     SDL_Rect pics_bounds[char_pics_count] = {0, 0, 0, 0};
     SDL_Texture *pics_textures[char_pics_count] = {NULL, NULL, NULL, NULL};
 
@@ -182,6 +185,9 @@ private:
             SDL_Surface *img = IMG_Load(create_address(char_num, i).c_str());
             pics_textures[i] = SDL_CreateTextureFromSurface(renderer, img);
             pics_bounds[i] = img->clip_rect;
+            float scale = (float)(bounds.h) / (float)(img->h);
+            pics_bounds[i].w *= scale;
+            pics_bounds[i].h *= scale;
             SDL_FreeSurface(img);
         }
     }
@@ -225,50 +231,66 @@ private:
     }
     void set_mode()
     {
+        const int right = keys[0];
+        const int left = keys[1];
+        const int up = keys[2];
+
         switch (event->type)
         {
         case SDL_KEYDOWN:
         {
-            switch (event->key.keysym.sym)
+            int key = event->key.keysym.sym;
+
+            if (key == up)
             {
-            case SDLK_UP:
-                mode = JUMPING;
-                dy = y_speed;
-                break;
-            case SDLK_LEFT:
+                if (mode != JUMPING)
+                {
+                    mode = JUMPING;
+                    dy = -y_speed;
+                }
+            }
+            if (key == left)
+            {
                 mode = RUNNING;
                 dx = -x_speed;
-                break;
-            case SDLK_RIGHT:
+            }
+            if (key == right)
+            {
                 mode = RUNNING;
                 dx = x_speed;
-                break;
             }
         }
         break;
 
         case SDL_KEYUP:
         {
-            switch (event->key.keysym.sym)
-            {
-            case SDLK_UP:
-                break;
+            int key = event->key.keysym.sym;
 
-            case SDLK_LEFT:
-                mode = NORMAL;
-                dx = 0;
-                SDL_PumpEvents();
-                SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
+            if (key == up)
+            {
                 break;
-            case SDLK_RIGHT:
+            }
+            if (key == left)
+            {
                 mode = NORMAL;
                 dx = 0;
-                SDL_PumpEvents();
-                SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
+                break;
+            }
+            if (key == right)
+            {
+                mode = NORMAL;
+                dx = 0;
                 break;
             }
         }
         break;
+        }
+        if (bounds.y + bounds.h > 600 && mode == JUMPING)
+        {
+            mode = NORMAL;
+            bounds.y = 600 - bounds.h;
+            dvy = 0;
+            dy = 0;
         }
     }
 
@@ -281,6 +303,10 @@ public:
         fill_pics_textures(renderer);
     }
     Character(Character &character) = delete;
+    void set_keys(int right, int left, int up)
+    {
+        keys[0] = right, keys[1] = left, keys[2] = up;
+    }
     void set_mode(Char_modes mode)
     {
         this->mode = mode;
@@ -306,8 +332,6 @@ public:
         case NORMAL:
         {
             dx = 0;
-            dy = 0;
-            dvy = 0;
             current_pic_number = 3;
             break;
         }
@@ -319,7 +343,9 @@ public:
         }
         case JUMPING:
         {
-
+            dy += dvy;
+            dvy = GRAVITY;
+            bounds.y += dy;
             break;
         }
         case TRIPLE:
@@ -339,11 +365,11 @@ public:
             break;
         }
         }
-        float scale = (float)bounds.h / (float)pics_bounds[current_pic_number].h;
+
         SDL_Rect rect = {bounds.x,
                          bounds.y,
-                         (int)(pics_bounds[current_pic_number].w * scale),
-                         (int)(pics_bounds[current_pic_number].h * scale)};
+                         pics_bounds[current_pic_number].w,
+                         pics_bounds[current_pic_number].h};
 
         SDL_SetRenderTarget(renderer, NULL);
         SDL_RenderCopy(renderer, pics_textures[current_pic_number], NULL, &rect);
@@ -354,6 +380,70 @@ public:
         destroy_pics_textures();
     }
 } Character;
+
+typedef struct ProgressBar
+{
+private:
+    Uint16 total_value = 0;
+    Uint16 current_value = 0;
+    SDL_Color front_color;
+    SDL_Color back_color;
+    SDL_Rect bounds;
+    SDL_Texture *back_texture = NULL;
+
+public:
+    ProgressBar(Uint16 total_value, Uint16 current_value, SDL_Color front_color, SDL_Color back_color, SDL_Rect bounds)
+    {
+        this->total_value = total_value;
+        this->current_value = current_value;
+        this->front_color = front_color;
+        this->back_color = back_color;
+        this->bounds = bounds;
+    }
+
+    void set_value(Uint16 value)
+    {
+        if(value > total_value){
+            value = total_value;
+        }
+        current_value = value;
+    }
+
+    Uint16 get_value()
+    {
+        return current_value;
+    }
+
+    void render(SDL_Renderer *renderer)
+    {
+        const float margin_ratio = 0.1;
+        const int margin = 5;
+        float ratio = (float)current_value / (float)total_value;
+        SDL_Texture *former = SDL_GetRenderTarget(renderer);
+        SDL_Rect front_rect{bounds.x + margin, bounds.y + margin, int(bounds.w*ratio*((float)(bounds.w - 2 * margin) / (float)bounds.w)), bounds.h - 2 * margin};
+        // SDL_Rect front_rect = {bounds.x, bounds.y, (int)(bounds.w * ratio), bounds.h};
+        //  front_rect.x += (int)(margin_ratio * bounds.w);
+        //  front_rect.y += (int)(margin_ratio * bounds.h);
+        //  front_rect.w = (int)(front_rect.w - 2*bounds.w * margin_ratio);
+        //  front_rect.h = (int)(front_rect.h - 2*bounds.h * margin_ratio);
+        if (back_texture == NULL)
+            back_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_RENDERER_TARGETTEXTURE, bounds.w, bounds.h);
+        SDL_SetRenderTarget(renderer, back_texture);
+        SDL_SetRenderDrawColor(renderer, back_color.r, back_color.g, back_color.b, back_color.a);
+        SDL_RenderFillRect(renderer, &bounds);
+        SDL_SetRenderDrawColor(renderer, front_color.r, front_color.g, front_color.b, front_color.a);
+        SDL_RenderFillRect(renderer, &front_rect);
+        SDL_SetRenderTarget(renderer, NULL);
+        render_text_center(renderer , (to_string((int)(ratio*100.0)) + string("%")).c_str() ,new SDL_Point{bounds.x+bounds.w/2 , bounds.y+bounds.h/2} , NULL , {255 , 255 , 255 , 255});
+        SDL_RenderCopy(renderer, back_texture, &bounds, &bounds);
+        SDL_SetRenderTarget(renderer, former);
+    }
+    ~ProgressBar()
+    {
+        SDL_DestroyTexture(back_texture);
+        back_texture = NULL;
+    }
+} ProgressBar;
 
 typedef struct Timer
 {
@@ -737,9 +827,10 @@ int main(int argc, char *argv[])
     SDL_Event *e = new SDL_Event;
     Text text;
     Timer timer;
-
+    ProgressBar prg1(100, 0, {240, 100, 80, 255}, {100, 120, 150, 255}, {100, 100, 300, 90});
     Character l_char(m_renderer, e, {100, 400, 100, 300}, 1);
     Character r_char(m_renderer, e, {500, 400, 100, 300}, 2);
+    r_char.set_keys(SDLK_d, SDLK_a, SDLK_w);
 
     //-----====-Main game loop start-====-----
     while (Game_State != STATE_QUIT)
@@ -755,13 +846,15 @@ int main(int argc, char *argv[])
         case STATE_START_MENU:
             break;
         case STATE_GAMING:
+            prg1.render(m_renderer);
+            prg1.set_value(prg1.get_value()+1);
+            r_char.render(m_renderer, NULL);
+            l_char.render(m_renderer, NULL);
             break;
         case STATE_PAUSE_MENU:
             break;
         case STATE_END_MENU:
         {
-            r_char.render(m_renderer, NULL);
-            l_char.render(m_renderer, NULL);
             break;
         }
         case STATE_QUIT:
