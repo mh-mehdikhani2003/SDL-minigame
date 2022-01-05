@@ -7,6 +7,7 @@
 
 #include <string>
 #include <fstream>
+#include <vector>
 #include <ctime>
 
 #ifdef __unix__
@@ -55,7 +56,7 @@
 using namespace std;
 
 //-----===== OK! Tested ====-----
-bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point buttom_center_point, Uint16 height, const char *image_address, SDL_Rect *srcrect = NULL, SDL_Rect *dstrect = NULL)
+bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, Uint16 height, const char *image_address, SDL_Rect *srcrect = NULL, SDL_Rect *dstrect = NULL)
 {
     SDL_Surface *surf = IMG_Load(image_address);
     if (!surf)
@@ -64,7 +65,7 @@ bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point buttom_center_point, 
     }
 
     float scale = (float)height / (float)surf->h;
-    SDL_Rect rect = {buttom_center_point.x - (int)(surf->w / 2.0 * scale), buttom_center_point.y - (int)(surf->h * scale), (int)(surf->w * scale), (int)(surf->h * scale)};
+    SDL_Rect rect = {center_point.x - (int)(surf->w / 2.0 * scale), center_point.y - height / 2, (int)(surf->w * scale), (int)(surf->h * scale)};
 
     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surf);
     if (!texture)
@@ -73,7 +74,7 @@ bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point buttom_center_point, 
         return false;
     }
     SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
-    // SDL_SetRenderTarget(renderer, NULL);
+    SDL_SetRenderTarget(renderer, NULL);
     SDL_RenderCopy(renderer, texture, srcrect, (dstrect == NULL ? &rect : dstrect));
 
     SDL_FreeSurface(surf);
@@ -82,6 +83,27 @@ bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point buttom_center_point, 
     former_texture = NULL;
     return true;
 }
+// bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, const char *image_address, SDL_Rect *dstrect, SDL_Rect *srcrect = NULL)
+// {
+//     SDL_Surface *surf = IMG_Load(image_address);
+//     if (!surf)
+//         return false;
+
+//     // dstrect->x = bottom_center_point.x - surf->w/2;
+//     // dstrect->y = bottom_center_point.y - surf->h;
+//     SDL_Texture *img_texture = SDL_CreateTextureFromSurface(renderer, surf);
+//     SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
+//     SDL_SetRenderTarget(renderer, NULL);
+//     SDL_RenderCopy(renderer, img_texture, srcrect, dstrect);
+//     SDL_FreeSurface(surf);
+//     SDL_DestroyTexture(img_texture);
+//     if (former_texture != NULL)
+//     {
+//         SDL_SetRenderTarget(renderer, former_texture);
+//     }
+//     SDL_DestroyTexture(former_texture);
+//     return true;
+// }
 //----==== OK! Tested ====-----
 SDL_Rect render_text_center(SDL_Renderer *renderer, const char *text, SDL_Point *center_point, TTF_Font *font = NULL, SDL_Color color = {0, 0, 0, 255})
 {
@@ -151,83 +173,168 @@ typedef enum Char_modes
 {
     NORMAL,
     CONFUSED,
+    FREEZED,
     TRIPLE,
-    RUNNING,
+    RUNNING_LEFT,
+    RUNNING_RIGHT,
     JUMPING
 } Char_modes;
+
+typedef enum Char_types
+{
+    CHARACTER_RIGHT,
+    CHARACTER_LEFT
+} Char_types;
+
 typedef struct Character
 {
 private:
+    Char_types type = CHARACTER_RIGHT;
     Char_modes mode = NORMAL;
-    bool on_jump = false;
-    int char_num = 1;
-    int current_pic_number = 3;
-    string img_addr = string(CHAR_RAW_ROOT) + string("1.png");
-    const static int char_pics_count = 4;
+    int body_number = 0;
+    int head_number = 0;
+
+    int initial_y = 0;
+
+    int shoes_current_number = 0;
+    int shoes_model = 0;
+    const static int shoes_cnt = 5;
+
+    const char *head_root = "./raw/Char/heads/";
+    const char *body_root = "./raw/Char/bodies/";
+    const char *shoes_root = "./raw/Char/shoes/";
+
+    float head_to_height_ratio = 0.4;
+    float body_to_height_ratio = 0.45;
+    float shoes_to_height_ratio = 0.15;
 
     const int triple_margin = 30;
-    const int x_speed = 50;
+    const int x_speed = 20;
     const int y_speed = 50;
-    int dx = 0, dy = 0, dvy = -10;
+    int dx = 0, dy = 0, dvy = 0;
     int keys[3] = {SDLK_RIGHT, SDLK_LEFT, SDLK_UP};
 
     SDL_Event *event = NULL;
 
     SDL_Rect bounds{0, 0, 0, 0};
     SDL_Texture *back_texture = NULL;
-    SDL_Rect pics_bounds[char_pics_count] = {0, 0, 0, 0};
-    SDL_Texture *pics_textures[char_pics_count] = {NULL, NULL, NULL, NULL};
+    SDL_Texture *head_texture = NULL;
+    SDL_Texture *body_texture = NULL;
+    SDL_Texture *shoes_textures[shoes_cnt] = {NULL};
+    SDL_Rect body_rect{0, 0, 0, 0};
+    SDL_Rect head_rect{0, 0, 0, 0};
+    SDL_Rect shoes_rects[shoes_cnt];
 
-    void fill_pics_textures(SDL_Renderer *renderer)
+    void set_scales()
     {
-        for (int i = 0; i < char_pics_count; i++)
+        int h = bounds.h;
+        float head_ratio = (h * head_to_height_ratio) / head_rect.h;
+        head_rect.h *= head_ratio;
+        head_rect.w *= head_ratio;
+
+        float body_ratio = (h * body_to_height_ratio) / body_rect.h;
+        body_rect.h *= body_ratio;
+        body_rect.w *= body_ratio;
+        body_rect.y = bounds.y + head_rect.h;
+
+        float shoes_ratio = (h * shoes_to_height_ratio) / shoes_rects[0].h;
+
+        for (int i = 0; i < shoes_cnt; i++)
         {
-            SDL_Surface *img = IMG_Load(create_address(char_num, i).c_str());
-            pics_textures[i] = SDL_CreateTextureFromSurface(renderer, img);
-            pics_bounds[i] = img->clip_rect;
-            float scale = (float)(bounds.h) / (float)(img->h);
-            pics_bounds[i].w *= scale;
-            pics_bounds[i].h *= scale;
+            shoes_rects[i].h *= shoes_ratio;
+            shoes_rects[i].w *= shoes_ratio;
+            shoes_rects[i].y = body_rect.y + body_rect.h;
+        }
+    }
+    void fill_textures(SDL_Renderer *renderer)
+    {
+        SDL_Surface *body_img = IMG_Load(create_body_and_head_address(body_root, body_number).c_str());
+        body_texture = SDL_CreateTextureFromSurface(renderer, body_img);
+        body_rect = body_img->clip_rect;
+        SDL_FreeSurface(body_img);
+
+        SDL_Surface *head_img = IMG_Load(create_body_and_head_address(head_root, head_number).c_str());
+        head_texture = SDL_CreateTextureFromSurface(renderer, head_img);
+        head_rect = head_img->clip_rect;
+        SDL_FreeSurface(head_img);
+
+        for (int i = 0; i < shoes_cnt; i++)
+        {
+            SDL_Surface *img = IMG_Load(create_shoes_address(shoes_model, i).c_str());
+            shoes_textures[i] = SDL_CreateTextureFromSurface(renderer, img);
+            shoes_rects[i] = img->clip_rect;
+            // float scale = (float)(bounds.h) / (float)(img->h);
+            // pics_bounds[i].w *= scale;
+            // pics_bounds[i].h *= scale;
             SDL_FreeSurface(img);
         }
     }
-
     void destroy_pics_textures()
     {
-        for (int i = 0; i < char_pics_count; i++)
+        SDL_DestroyTexture(head_texture);
+        head_rect = {0, 0, 0, 0};
+        head_texture = NULL;
+        SDL_DestroyTexture(body_texture);
+        body_rect = {0, 0, 0, 0};
+        body_texture = NULL;
+        for (int i = 0; i < shoes_cnt; i++)
         {
-            SDL_DestroyTexture(pics_textures[i]);
-            pics_textures[i] = NULL;
+            SDL_DestroyTexture(shoes_textures[i]);
+            shoes_rects[i] = {0, 0, 0, 0};
+            shoes_textures[i] = NULL;
         }
     }
+    void render_head(SDL_Renderer *renderer)
+    {
+        SDL_Point dstpoint = {bounds.x + bounds.w / 2, bounds.y + head_rect.h / 2};
+        draw_image_on_point(renderer, SDL_Point{dstpoint.x, dstpoint.y}, head_rect.h, create_body_and_head_address(head_root, head_number).c_str());
+    }
+    void render_body(SDL_Renderer *renderer)
+    {
+        SDL_Point dstpoint = {bounds.x + bounds.w / 2, bounds.y + head_rect.h + body_rect.h / 2};
+        draw_image_on_point(renderer, SDL_Point{dstpoint.x, dstpoint.y}, body_rect.h, create_body_and_head_address(body_root, body_number).c_str());
+    }
+    void render_shoes(SDL_Renderer *renderer)
+    {
+        SDL_Point dstpoint_r{0, 0};
+        SDL_Point dstpoint_l{0, 0};
+        int right_index = shoes_current_number;
+        int left_index = ((mode == RUNNING_LEFT || mode == RUNNING_RIGHT) ? shoes_cnt - 1 - shoes_current_number : shoes_current_number);
 
-    string create_address()
+        if (type == CHARACTER_RIGHT)
+        {
+            dstpoint_l.x = bounds.x + bounds.w / 2 + body_rect.w / 2 - shoes_rects[shoes_current_number].w / 2 + body_rect.w / 3;
+            dstpoint_r.x = bounds.x + bounds.w / 2 - shoes_rects[shoes_current_number].w / 2 + body_rect.w / 3;
+        }
+        else
+        {
+            dstpoint_r.x = bounds.x + bounds.w / 2 + body_rect.w / 2 - shoes_rects[shoes_current_number].w / 2 + body_rect.w / 3;
+            dstpoint_l.x = bounds.x + bounds.w / 2 - shoes_rects[shoes_current_number].w / 2 + body_rect.w / 3;
+        }
+
+        dstpoint_l.y = bounds.y + head_rect.h + body_rect.h + shoes_rects[0].h / 2;
+        dstpoint_r.y = bounds.y + head_rect.h + body_rect.h + shoes_rects[0].h / 2;
+        draw_image_on_point(renderer, dstpoint_r, shoes_rects[right_index].h, create_shoes_address(shoes_model, right_index).c_str());
+        draw_image_on_point(renderer, dstpoint_l, shoes_rects[left_index].h, create_shoes_address(shoes_model, left_index).c_str());
+    }
+    string create_shoes_address(int model, int number)
     {
-        string result = "";
-        result += "./raw/Char/";
-        result += to_string(char_num);
-        if (current_pic_number != 0)
+        string result = shoes_root;
+        result += to_string(model);
+        if (number > 0)
         {
             result += "(";
-            result += to_string(current_pic_number);
+            result += to_string(number);
             result += ")";
         }
         result += ".png";
         return result;
     }
-    string create_address(int char_number, int pic_number)
+    string create_body_and_head_address(string root, int pic_number)
     {
-        string result = "";
-        result += "./raw/Char/";
-        result += to_string(char_number);
-        if (pic_number != 0)
-        {
-            result += "(";
-            result += to_string(pic_number);
-            result += ")";
-        }
-        result += ".png";
-        return result;
+        root += to_string(pic_number);
+        root += ".png";
+        return root;
     }
     void set_mode()
     {
@@ -243,21 +350,15 @@ private:
 
             if (key == up)
             {
-                if (mode != JUMPING)
-                {
-                    mode = JUMPING;
-                    dy = -y_speed;
-                }
+                mode = JUMPING;
             }
             if (key == left)
             {
-                mode = RUNNING;
-                dx = -x_speed;
+                mode = RUNNING_LEFT;
             }
             if (key == right)
             {
-                mode = RUNNING;
-                dx = x_speed;
+                mode = RUNNING_RIGHT;
             }
         }
         break;
@@ -273,110 +374,83 @@ private:
             if (key == left)
             {
                 mode = NORMAL;
-                dx = 0;
                 break;
             }
             if (key == right)
             {
                 mode = NORMAL;
-                dx = 0;
                 break;
             }
         }
         break;
         }
-        if (bounds.y + bounds.h > 600 && mode == JUMPING)
-        {
-            mode = NORMAL;
-            bounds.y = 600 - bounds.h;
-            dvy = 0;
-            dy = 0;
-        }
     }
 
 public:
-    Character(SDL_Renderer *renderer, SDL_Event *event, SDL_Rect bounds, int char_num)
+    Character(SDL_Renderer *renderer, SDL_Event *event, SDL_Rect bounds, Char_types type, int head_number = 0, int body_number = 0, int shoes_model = 0, int shoe_number = 0)
     {
-        this->char_num = char_num;
+        this->head_number = head_number;
+        this->body_number = body_number;
+        this->shoes_model = shoes_model;
+        this->shoes_current_number = shoe_number;
         this->bounds = bounds;
         this->event = event;
-        fill_pics_textures(renderer);
+        fill_textures(renderer);
+        set_scales();
+        initial_y = bounds.y;
+        this->type = type;
     }
     Character(Character &character) = delete;
-    void set_keys(int right, int left, int up)
+    void set_keys(int right, int left, int up) { keys[0] = right, keys[1] = left, keys[2] = up; }
+    void set_mode(Char_modes mode) { this->mode = mode; }
+    Char_modes get_mode() { return mode; }
+    Char_types get_type() { return type; }
+    void set_texture(SDL_Texture *new_texture) { back_texture = new_texture; }
+    SDL_Texture *get_texture() { return back_texture; }
+    void render(SDL_Renderer *renderer)
     {
-        keys[0] = right, keys[1] = left, keys[2] = up;
-    }
-    void set_mode(Char_modes mode)
-    {
-        this->mode = mode;
-    }
-    Char_modes get_mode()
-    {
-        return mode;
-    }
-    void set_texture(SDL_Texture *new_texture)
-    {
-        back_texture = new_texture;
-    }
-    SDL_Texture *get_texture()
-    {
-        return back_texture;
-    }
-    void render(SDL_Renderer *renderer, SDL_Rect *srcrect)
-    {
-        SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
         set_mode();
-        switch (mode)
+        render_body(renderer);
+        render_head(renderer);
+        if (mode == RUNNING_LEFT || mode == RUNNING_RIGHT)
         {
-        case NORMAL:
-        {
-            dx = 0;
-            current_pic_number = 3;
-            break;
-        }
-        case CONFUSED:
-        {
-            SDL_SetRenderTarget(renderer, NULL);
-            SDL_RenderCopy(renderer, back_texture, srcrect, &bounds);
-            break;
-        }
-        case JUMPING:
-        {
-            dy += dvy;
-            dvy = GRAVITY;
-            bounds.y += dy;
-            break;
-        }
-        case TRIPLE:
-        {
-            SDL_SetRenderTarget(renderer, NULL);
-            SDL_RenderCopy(renderer, back_texture, srcrect, &bounds);
-            break;
-        }
-        case RUNNING:
-        {
-            current_pic_number += 1;
-            if (current_pic_number > 3)
+            dx = (mode == RUNNING_LEFT ? -x_speed : x_speed);
+            shoes_current_number++;
+            if (shoes_current_number >= shoes_cnt)
             {
-                current_pic_number = 0;
+                shoes_current_number = 0;
             }
-            bounds.x += dx;
-            break;
         }
+        if (mode == NORMAL)
+        {
+            shoes_current_number = 0;
+            dx = 0;
         }
-
-        SDL_Rect rect = {bounds.x,
-                         bounds.y,
-                         pics_bounds[current_pic_number].w,
-                         pics_bounds[current_pic_number].h};
-
-        SDL_SetRenderTarget(renderer, NULL);
-        SDL_RenderCopy(renderer, pics_textures[current_pic_number], NULL, &rect);
-        SDL_SetRenderTarget(renderer, former_texture);
+        if (mode == JUMPING)
+        {
+            if (dvy == 0)
+            {
+                dvy = GRAVITY;
+                dy = -y_speed;
+            }
+        }
+        if (bounds.y > initial_y)
+        {
+            bounds.y = initial_y;
+            dy = 0;
+            dvy = 0;
+            mode = NORMAL;
+        }
+        // set_scales();
+        render_shoes(renderer);
+        bounds.x += dx;
+        dy += dvy;
+        bounds.y += dy;
     }
     ~Character()
     {
+        SDL_DestroyTexture(back_texture);
+        back_texture = NULL;
         destroy_pics_textures();
     }
 } Character;
@@ -403,7 +477,8 @@ public:
 
     void set_value(Uint16 value)
     {
-        if(value > total_value){
+        if (value > total_value)
+        {
             value = total_value;
         }
         current_value = value;
@@ -420,7 +495,7 @@ public:
         const int margin = 5;
         float ratio = (float)current_value / (float)total_value;
         SDL_Texture *former = SDL_GetRenderTarget(renderer);
-        SDL_Rect front_rect{bounds.x + margin, bounds.y + margin, int(bounds.w*ratio*((float)(bounds.w - 2 * margin) / (float)bounds.w)), bounds.h - 2 * margin};
+        SDL_Rect front_rect{bounds.x + margin, bounds.y + margin, int(bounds.w * ratio * ((float)(bounds.w - 2 * margin) / (float)bounds.w)), bounds.h - 2 * margin};
         // SDL_Rect front_rect = {bounds.x, bounds.y, (int)(bounds.w * ratio), bounds.h};
         //  front_rect.x += (int)(margin_ratio * bounds.w);
         //  front_rect.y += (int)(margin_ratio * bounds.h);
@@ -434,7 +509,7 @@ public:
         SDL_SetRenderDrawColor(renderer, front_color.r, front_color.g, front_color.b, front_color.a);
         SDL_RenderFillRect(renderer, &front_rect);
         SDL_SetRenderTarget(renderer, NULL);
-        render_text_center(renderer , (to_string((int)(ratio*100.0)) + string("%")).c_str() ,new SDL_Point{bounds.x+bounds.w/2 , bounds.y+bounds.h/2} , NULL , {255 , 255 , 255 , 255});
+        render_text_center(renderer, (to_string((int)(ratio * 100.0)) + string("%")).c_str(), new SDL_Point{bounds.x + bounds.w / 2, bounds.y + bounds.h / 2}, NULL, {255, 255, 255, 255});
         SDL_RenderCopy(renderer, back_texture, &bounds, &bounds);
         SDL_SetRenderTarget(renderer, former);
     }
@@ -504,7 +579,6 @@ public:
         return get_time() > alarm;
     }
 } Timer;
-
 typedef struct Text
 {
     std::string text = " ";
@@ -524,6 +598,86 @@ typedef struct Text
     }
 
 } Text;
+
+typedef struct TextBox
+{
+private:
+    Text text;
+    SDL_Rect bounds;
+    SDL_Texture *back_texture = NULL;
+    SDL_Color back_color{255, 255, 200, 255};
+    SDL_Color border_color{255, 200, 220, 255};
+    bool enabled = false;
+    SDL_Event* e=NULL;
+
+    void read_keys_and_mouse(SDL_Event *event)
+    {
+        int x = 0, y = 0;
+        if (SDL_GetMouseState(&x, &y) & SDL_BUTTON_LMASK)
+        {
+            if (SDL_PointInRect(new SDL_Point{x, y}, &bounds))
+                enabled = true;
+            else
+                enabled = false;
+        }
+
+        if (SDL_PollEvent(event) && enabled)
+        {
+            if (event->type == SDL_KEYDOWN)
+            {
+                switch (event->key.keysym.sym)
+                {
+                case SDLK_BACKSPACE:
+                {
+                    if (text.text.size() > 0)
+                        text.text.erase(text.text.end() - 1);
+                }
+                default:
+                {
+                    text.text += event->key.keysym.sym;
+                }
+                }
+            }
+        }
+    }
+
+public:
+    TextBox(Text text, SDL_Color back_color, SDL_Rect bounds , SDL_Event* e)
+    {
+        this->text = text;
+        text.text="";
+        this->back_color = back_color;
+        this->bounds = bounds;
+        this->e = e;
+    }
+    TextBox(Text text, const char *back_surf_addr, SDL_Rect bounds)
+    {
+    }
+    void render(SDL_Renderer *renderer)
+    {
+        read_keys_and_mouse(e);
+        SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
+        if(back_texture == NULL){
+            back_texture = SDL_CreateTexture(renderer , SDL_PIXELFORMAT_RGBA8888 , SDL_TEXTUREACCESS_TARGET , bounds.w , bounds.h);
+        }
+        SDL_SetRenderTarget(renderer , back_texture);
+        SDL_SetRenderDrawColor(renderer, back_color.r, back_color.g, back_color.b, back_color.a);
+        SDL_RenderFillRect(renderer,new SDL_Rect{0,0,bounds.w , bounds.h});
+
+        if (enabled)
+        {
+            SDL_SetRenderDrawColor(renderer, border_color.r, border_color.g, border_color.b, border_color.a);
+            SDL_RenderDrawRect(renderer, new SDL_Rect{0,0,bounds.w , bounds.h});
+        }
+        SDL_SetRenderTarget(renderer, NULL);
+        SDL_RenderCopy(renderer , back_texture , NULL , &bounds);
+        if (former_texture != NULL)
+        {
+            SDL_SetRenderTarget(renderer, former_texture);
+        }
+        render_text_center(renderer, text.text.c_str(), new SDL_Point{bounds.x + bounds.w / 2, bounds.y + bounds.h / 2});
+    }
+} TextBox;
 
 struct Button
 {
@@ -625,7 +779,7 @@ public:
         SDL_PumpEvents();
         return (SDL_PointInRect(new SDL_Point{x, y}, &bounds) && (state & SDL_BUTTON_LMASK));
     }
-    void set_text(Text text)
+    void set_text(Text &text)
     {
         this->text = text;
     }
@@ -826,12 +980,14 @@ int main(int argc, char *argv[])
     //-----====-Create main elements-====-----
     SDL_Event *e = new SDL_Event;
     Text text;
-    Timer timer;
-    ProgressBar prg1(100, 0, {240, 100, 80, 255}, {100, 120, 150, 255}, {100, 100, 300, 90});
-    Character l_char(m_renderer, e, {100, 400, 100, 300}, 1);
-    Character r_char(m_renderer, e, {500, 400, 100, 300}, 2);
-    r_char.set_keys(SDLK_d, SDLK_a, SDLK_w);
+   // Timer timer;
+    //ProgressBar prg1(100, 0, {240, 100, 80, 255}, {100, 120, 150, 255}, {100, 100, 300, 90});
+    //Character l_char(m_renderer, e, {100, 400, 100, 300}, CHARACTER_LEFT, 0, 1, 2);
+    //Character r_char(m_renderer, e, {500, 400, 100, 300}, CHARACTER_RIGHT, 0);
+    //r_char.set_keys(SDLK_d, SDLK_a, SDLK_w);
+    //Button btn1(m_renderer, SDL_Color{100, 200, 250, 255}, SDL_Rect{100, 100, 100, 40});
 
+    TextBox tb(text , SDL_Color{150 , 190 , 220 , 255},{100 , 100 , 200 , 60} , e);
     //-----====-Main game loop start-====-----
     while (Game_State != STATE_QUIT)
     {
@@ -846,10 +1002,12 @@ int main(int argc, char *argv[])
         case STATE_START_MENU:
             break;
         case STATE_GAMING:
-            prg1.render(m_renderer);
-            prg1.set_value(prg1.get_value()+1);
-            r_char.render(m_renderer, NULL);
-            l_char.render(m_renderer, NULL);
+            tb.render(m_renderer);
+            // prg1.render(m_renderer);
+            // prg1.set_value(prg1.get_value() + 1);
+            //r_char.render(m_renderer);
+            //l_char.render(m_renderer);
+            // btn1.render(m_renderer);
             break;
         case STATE_PAUSE_MENU:
             break;
