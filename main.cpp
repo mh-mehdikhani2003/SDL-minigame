@@ -12,10 +12,6 @@
 #include <cctype>
 
 #ifdef __unix__
-#ifndef SCORE_FILE_ADDR
-#define SCORES_FILE_ADDR "./scores"
-#define SCORE_FILE_ADDR
-#endif
 #ifndef __GFX__
 #include <SDL2/SDL2_gfxPrimitives.h>
 #define __GFX__
@@ -23,24 +19,17 @@
 #endif
 
 #ifdef __linux__
-#ifndef SCORE_FILE_ADDR
-#define SCORES_FILE_ADDR "./scores"
-#define SCORE_FILE_ADDR
-#endif
 #ifndef __GFX__
 #include <SDL2/SDL2_gfxPrimitives.h>
 #define __GFX__
 #endif
 #endif
 
-#ifndef SCORE_FILE_ADDR
-#define SCORES_FILE_ADDR ".\scores"
-#define SCORE_FILE_ADDR
-#endif
-
 #ifndef __GFX__
 #include <SDL2/SDL_gfx>
 #endif
+
+#define DATA_FILE_ADDR "./data/games/"
 
 #define CHAR_RAW_ROOT "./raw/Char/"
 #define FONT_ADDR "./arial.ttf"
@@ -52,7 +41,7 @@
 #define HEIGHT 800
 #define BOTTOM_MARGIN 100
 
-#define CHAR_HEIGHT 200
+#define CHAR_HEIGHT 150
 
 using namespace std;
 
@@ -168,6 +157,16 @@ typedef enum States
 } States;
 States Game_State = STATE_GAMING;
 
+typedef enum Powers
+{
+    KICKFIRE,
+    PUNCH,
+    INVISIBLE_BALL,
+    THIEF,
+    NONE
+} Powers;
+Powers Power;
+
 typedef struct Ball
 {
 private:
@@ -175,8 +174,13 @@ private:
     int vy = 0;
     Uint8 ay = GRAVITY;
 
-    const int MAX_VELOCITY = 45;
+    Powers power = NONE;
+    string power_owner = "";
+    Uint32 start_invisibility_time = 0;
 
+    const int MAX_VELOCITY = 55;
+
+    int current_number_cntr = 0;
     const Uint8 pictures_cnt = 2;
     Uint8 current_number = 0;
     Uint8 current_model = 0;
@@ -184,6 +188,7 @@ private:
 
     SDL_Point *pcenter = new SDL_Point{0, 0};
     int r = 0;
+    int initial_r = 0;
     SDL_Color color{0, 0, 0, 255};
 
     string create_addres()
@@ -204,8 +209,10 @@ public:
         this->r = r;
         this->color = color;
         this->current_model = model;
+        initial_r = r;
     }
-
+    void set_power(Powers new_power, string power_owner) { power = new_power, this->power_owner = power_owner; }
+    Powers get_power() { return power; }
     void set_model(int new_model)
     {
         current_model = new_model;
@@ -220,14 +227,14 @@ public:
         }
         if (vy > MAX_VELOCITY || vy < -MAX_VELOCITY)
         {
-            vy = MAX_VELOCITY * (vy > 0 ? 1 : -1);
+            // vy = MAX_VELOCITY * (vy > 0 ? 1 : -1);
         }
         vy += GRAVITY;
         pcenter->x += vx;
         pcenter->y += vy;
         if (pcenter->y + r > HEIGHT - BOTTOM_MARGIN)
         {
-            vy *= -1;
+            vy *= -0.9;
             pcenter->y = HEIGHT - BOTTOM_MARGIN - r;
         }
         if (pcenter->x < r)
@@ -240,18 +247,53 @@ public:
             vx *= -1;
             pcenter->x = WIDTH - r;
         }
-        current_number++;
-        if (current_number >= pictures_cnt)
+        current_number_cntr++;
+        if (current_number_cntr >= pictures_cnt)
+        {
+            current_number++;
+            current_number_cntr = 0;
+            if (current_number >= pictures_cnt)
+            {
+                current_number = 0;
+            }
+        }
+        if (vy < -1000)
+        {
+            vy = -1000;
+        }
+        if (vx == 0)
         {
             current_number = 0;
         }
-        draw_image_on_point(renderer, *pcenter, 2 * r, create_addres().c_str());
+        if (power != INVISIBLE_BALL)
+        {
+            if (power == KICKFIRE)
+                r = 1.5 * initial_r;
+            if (power == NONE)
+            {
+                r = initial_r;
+            }
+            draw_image_on_point(renderer, *pcenter, 2 * r, create_addres().c_str());
+        }
+        else
+        {
+            if (start_invisibility_time == 0)
+            {
+                start_invisibility_time = SDL_GetTicks();
+            }
+            if (SDL_GetTicks() - start_invisibility_time > 3000)
+            {
+                start_invisibility_time = 0;
+                power = NONE;
+            }
+        }
     }
     void set_vx(int vx) { this->vx = vx; }
     void set_vy(int vy) { this->vy = vy; }
     int get_ay() { return ay; }
     int get_vx() { return vx; }
     int get_vy() { return vy; }
+    string get_power_owner() { return power_owner; }
     SDL_Point get_center()
     {
         return *pcenter;
@@ -305,25 +347,37 @@ private:
     int body_number = 0;
     int head_number = 0;
 
+    Uint8 num_of_goals = 0;
+
+    int power_percent = 0;
     int initial_y = 0;
 
     int shoes_current_number = 0;
     int shoes_model = 0;
     const static int shoes_cnt = 4;
+    const static int conf_pics_cnt = 2;
+
+    int current_conf_pic = 0;
 
     const char *head_root = "./raw/Char/heads/";
     const char *body_root = "./raw/Char/bodies/";
     const char *shoes_root = "./raw/Char/shoes/";
+    const char *conf_pics_root = "./raw/Char/confusing/";
+
+    Uint32 conf_time = 0;
 
     float head_to_height_ratio = 0.5;
-    float body_to_height_ratio = 0.2;
-    float shoes_to_height_ratio = 0.3;
+    float body_to_height_ratio = 0.25;
+    float shoes_to_height_ratio = 0.25;
 
     const int triple_margin = 30;
     const int x_speed = 20;
     const int y_speed = 75;
     int dx = 0, dy = 0, dvy = 0;
-    int keys[3] = {SDLK_RIGHT, SDLK_LEFT, SDLK_UP};
+    int keys[4] = {SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN};
+
+    string name = " ";
+    Powers power = NONE;
 
     SDL_Event *event = NULL;
 
@@ -398,22 +452,19 @@ private:
     void render_head(SDL_Renderer *renderer)
     {
         SDL_Point dstpoint = {bounds.x + bounds.w / 2, bounds.y + head_rect.h / 2};
-        SDL_RenderCopy(renderer , head_texture , NULL , &head_rect);
-        // draw_image_on_current_texture(renderer, SDL_Point{dstpoint.x, dstpoint.y}, head_rect.h, create_body_and_head_address(head_root, head_number).c_str());
+        SDL_RenderCopy(renderer, head_texture, NULL, &head_rect);
     }
     void render_body(SDL_Renderer *renderer)
     {
         SDL_Point dstpoint = {bounds.x + bounds.w / 2, bounds.y + head_rect.h + body_rect.h / 2};
-        SDL_RenderCopy(renderer , body_texture , NULL , &body_rect);
-        // draw_image_on_current_texture(renderer, SDL_Point{dstpoint.x, dstpoint.y}, body_rect.h, create_body_and_head_address(body_root, body_number).c_str());
+        SDL_RenderCopy(renderer, body_texture, NULL, &body_rect);
     }
     void render_foot(SDL_Renderer *renderer)
     {
         SDL_Point dstpoint{0, 0};
         dstpoint.x = bounds.x + bounds.w / 2;
         dstpoint.y = bounds.y + head_rect.h + body_rect.h + shoes_rects[shoes_current_number].h / 2;
-        SDL_RenderCopy(renderer , shoes_textures[shoes_current_number] , NULL , &shoes_rects[shoes_current_number]);
-        // draw_image_on_current_texture(renderer, dstpoint, shoes_rects[shoes_current_number].h, create_shoes_address(shoes_model, shoes_current_number).c_str());
+        SDL_RenderCopy(renderer, shoes_textures[shoes_current_number], NULL, &shoes_rects[shoes_current_number]);
     }
     string create_shoes_address(int model, int number)
     {
@@ -434,11 +485,24 @@ private:
         root += ".png";
         return root;
     }
+    string create_conf_pic_addr()
+    {
+        string result = string(conf_pics_root);
+        current_conf_pic++;
+        if (current_conf_pic >= 10)
+        {
+            current_conf_pic = 0;
+        }
+        result += to_string(current_conf_pic / 5);
+        result += ".png";
+        return result;
+    }
     void set_mode()
     {
         const int right = keys[0];
         const int left = keys[1];
         const int up = keys[2];
+        const int power_k = keys[3];
 
         switch (event->type)
         {
@@ -457,6 +521,15 @@ private:
             if (key == right)
             {
                 mode = RUNNING_RIGHT;
+            }
+            if (key == power_k)
+            {
+                SDL_Rect &r = shoes_rects[shoes_current_number];
+                if (power_percent >= 100 && SDL_PointInRect(new SDL_Point{ball->get_x(), ball->get_y()}, new SDL_Rect{r.x - 50, r.y - 50, r.w + 100, r.h + 100}))
+                {
+                    ball->set_power(power, name);
+                    power_percent = 0;
+                }
             }
         }
         break;
@@ -502,6 +575,23 @@ private:
                 ball->set_y(r.y + ball->get_r());
             }
             ball->set_vy(dy - ball->get_vy());
+            if (name != ball->get_power_owner())
+            {
+                switch (ball->get_power())
+                {
+                case KICKFIRE:
+                    bounds.x = bounds.x + (type == CHARACTER_LEFT ? -100 : 100);
+                    mode = CONFUSED;
+                    ball->set_power(NONE, name);
+                    break;
+                case PUNCH:
+                    mode = CONFUSED;
+                    ball->set_power(NONE, name);
+                    break;
+                default:
+                    break;
+                }
+            }
             return true;
         }
         return false;
@@ -512,7 +602,7 @@ private:
         int collision = check_for_collision(rect, ball->get_bounds());
         if (collision >= 0)
         {
-            ball->set_vx(dx - ball->get_vx());
+            ball->set_vx(dx - ball->get_vx() * 0.92);
             if (collision == 1)
             {
                 ball->set_x(rect.x + rect.w + ball->get_r());
@@ -529,7 +619,24 @@ private:
             {
                 ball->set_y(rect.y + ball->get_r());
             }
-            ball->set_vy(dy - ball->get_vy());
+            ball->set_vy(dy - ball->get_vy() * 0.92);
+            if (name != ball->get_power_owner())
+            {
+                switch (ball->get_power())
+                {
+                case KICKFIRE:
+                    bounds.x = bounds.x + (type == CHARACTER_LEFT ? -100 : 100);
+                    mode = CONFUSED;
+                    ball->set_power(NONE, name);
+                    break;
+                case PUNCH:
+                    mode = CONFUSED;
+                    ball->set_power(NONE, name);
+                    break;
+                default:
+                    break;
+                }
+            }
             return true;
         }
         return false;
@@ -544,7 +651,7 @@ private:
             {
                 if (type == CHARACTER_LEFT)
                 {
-                    ball->set_vx(dx - ball->get_vx());
+                    ball->set_vx(dx - ball->get_vx() * 0.95);
                     ball->set_vy(dy + 30);
                     ball->set_x(r.x + r.w + ball->get_r());
                 }
@@ -553,7 +660,7 @@ private:
             {
                 if (type == CHARACTER_RIGHT)
                 {
-                    ball->set_vx(dx - ball->get_vx());
+                    ball->set_vx(dx - ball->get_vx() * 0.95);
                     ball->set_vy(dy + 30);
                     ball->set_x(r.x - ball->get_r() - 5);
                 }
@@ -570,13 +677,31 @@ private:
                 ball->set_vy(dx - (ball->get_vx() + ball->get_vy()) / 2);
                 ball->set_y(r.y + ball->get_r());
             }
+            if (name != ball->get_power_owner())
+            {
+                switch (ball->get_power())
+                {
+                case KICKFIRE:
+                    bounds.x = bounds.x + (type == CHARACTER_LEFT ? -100 : 100);
+                    mode = CONFUSED;
+                    ball->set_power(NONE, name);
+                    break;
+                case PUNCH:
+                    mode = CONFUSED;
+                    ball->set_power(NONE, name);
+                    break;
+                default:
+                    break;
+                }
+            }
             return true;
         }
+
         return false;
     }
 
 public:
-    Character(SDL_Renderer *renderer, SDL_Event *event, SDL_Rect bounds, Char_types type, Ball *ball, int head_number = 0, int body_number = 0, int shoes_model = 0, int shoe_number = 0)
+    Character(SDL_Renderer *renderer, SDL_Event *event, SDL_Rect bounds, Char_types type, Ball *ball, Powers power, int head_number = 0, int body_number = 0, int shoes_model = 0, int shoe_number = 0)
     {
         this->head_number = head_number;
         this->body_number = body_number;
@@ -589,12 +714,15 @@ public:
         initial_y = bounds.y;
         this->ball = ball;
         this->type = type;
+        this->power = power;
     }
     Character(Character &character) = delete;
-    void set_keys(int right, int left, int up) { keys[0] = right, keys[1] = left, keys[2] = up; }
-    void set_mode(Char_modes mode) { this->mode = mode; }
+    void set_keys(int right, int left, int up, int power_key) { keys[0] = right, keys[1] = left, keys[2] = up, keys[3] = power_key; }
+    Uint8 get_num_of_goals() { return num_of_goals; }
+    void add_goal() { num_of_goals++; }
     Char_modes get_mode() { return mode; }
     Char_types get_type() { return type; }
+    void set_name(string name) { this->name = name; }
     bool ball_collision(SDL_Rect *ball_bounds)
     {
         if (ball_bounds->y > bounds.y)
@@ -610,8 +738,16 @@ public:
     SDL_Texture *get_texture() { return back_texture; }
     void render(SDL_Renderer *renderer)
     {
-        SDL_SetRenderTarget(renderer , back_texture);
-        set_mode();
+        SDL_SetRenderTarget(renderer, back_texture);
+        if (mode != CONFUSED)
+        {
+            set_mode();
+        }
+        else
+        {
+            dx = 0;
+            dy = 0;
+        }
         render_body(renderer);
         render_foot(renderer);
         render_head(renderer);
@@ -650,14 +786,39 @@ public:
         head_rect = this->get_head_rect();
         body_rect = this->get_body_rect();
         shoes_rects[shoes_current_number] = this->get_feet_rect();
-        if (!ball_foot_collision())
+
+        if (mode != CONFUSED)
         {
-            if (!ball_head_colision())
+            if (!ball_foot_collision())
             {
-                ball_body_collision();
+                if (!ball_head_colision())
+                {
+                    ball_body_collision();
+                }
             }
         }
-        //SDL_RenderCopy(renderer , back_texture , NULL , new SDL_Rect{bounds.x , bounds.y , 200 , 100});
+        else
+        {
+            if (conf_time == 0)
+            {
+                conf_time = SDL_GetTicks();
+            }
+            if (SDL_GetTicks() - conf_time > 3000)
+            {
+                mode = NORMAL;
+                conf_time = 0;
+            }
+            SDL_RenderCopy(renderer, IMG_LoadTexture(renderer, create_conf_pic_addr().c_str()), NULL, new SDL_Rect{bounds.x - 20, bounds.y - 100, head_rect.w + 40, 100});
+        }
+        if (bounds.x < 0)
+        {
+            bounds.x = 1;
+        }
+        if (bounds.x + bounds.w > WIDTH)
+        {
+            bounds.x = WIDTH - bounds.w;
+        }
+        power_percent += 1;
     }
     int get_vx() { return dx; }
     int get_vy() { return dy; }
@@ -676,6 +837,14 @@ public:
         r.y = bounds.y + head_rect.h + body_rect.h;
         return r;
     }
+    string get_name() { return name; }
+    void set_power_precent(int p)
+    {
+        power_percent = p;
+        if (power_percent > 100)
+            power_percent = 100;
+    }
+    int get_power_precent() { return power_percent; }
     void set_vx(int new_vx) { dx = new_vx; }
     void set_vy(int new_vy) { dy = new_vy; }
     ~Character()
@@ -695,6 +864,7 @@ private:
     SDL_Color back_color;
     SDL_Rect bounds;
     SDL_Texture *back_texture = NULL;
+    TTF_Font *font = TTF_OpenFont("./arial.ttf", 20);
 
 public:
     ProgressBar(Uint16 total_value, Uint16 current_value, SDL_Color front_color, SDL_Color back_color, SDL_Rect bounds)
@@ -727,11 +897,7 @@ public:
         float ratio = (float)current_value / (float)total_value;
         SDL_Texture *former = SDL_GetRenderTarget(renderer);
         SDL_Rect front_rect{bounds.x + margin, bounds.y + margin, int(bounds.w * ratio * ((float)(bounds.w - 2 * margin) / (float)bounds.w)), bounds.h - 2 * margin};
-        // SDL_Rect front_rect = {bounds.x, bounds.y, (int)(bounds.w * ratio), bounds.h};
-        //  front_rect.x += (int)(margin_ratio * bounds.w);
-        //  front_rect.y += (int)(margin_ratio * bounds.h);
-        //  front_rect.w = (int)(front_rect.w - 2*bounds.w * margin_ratio);
-        //  front_rect.h = (int)(front_rect.h - 2*bounds.h * margin_ratio);
+
         if (back_texture == NULL)
             back_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_RENDERER_TARGETTEXTURE, bounds.w, bounds.h);
         SDL_SetRenderTarget(renderer, back_texture);
@@ -740,7 +906,7 @@ public:
         SDL_SetRenderDrawColor(renderer, front_color.r, front_color.g, front_color.b, front_color.a);
         SDL_RenderFillRect(renderer, &front_rect);
         SDL_SetRenderTarget(renderer, NULL);
-        render_text_center(renderer, (to_string((int)(ratio * 100.0)) + string("%")).c_str(), new SDL_Point{bounds.x + bounds.w / 2, bounds.y + bounds.h / 2}, NULL, {255, 255, 255, 255});
+        render_text_center(renderer, (to_string((int)(ratio * 100.0)) + string("%")).c_str(), new SDL_Point{bounds.x + bounds.w / 2, bounds.y + bounds.h / 2}, font);
         SDL_RenderCopy(renderer, back_texture, &bounds, &bounds);
         SDL_SetRenderTarget(renderer, former);
     }
@@ -1078,47 +1244,33 @@ public:
 
 typedef struct Button Button;
 
-bool read_best_score(long &score)
-{
-    std::ifstream file(SCORES_FILE_ADDR);
-    if (!file.is_open())
-    {
-        std::ofstream m_file(SCORES_FILE_ADDR);
-        m_file.close();
-        file.open(SCORES_FILE_ADDR);
-        if (!file.is_open())
-        {
-            return -1;
-        }
-    }
-    if (file)
-    {
-        std::string data = "";
-        file >> data;
-        if (data != "")
-        {
-            score = std::stol(data);
-        }
-        else
-        {
-            score = 0;
-        }
-        file.close();
-        return true;
-    }
-    return false;
-}
+// bool read_games_from_file(vector<Game> &character)
+// {
+//     std::ifstream file(DATA_FILE_ADDR);
+//     if (!file.is_open())
+//     {
+//         return false;
+//     }
+// }
 
-bool set_best_score(const long score)
+bool write_game_to_file(string data)
 {
-    std::ofstream file(SCORES_FILE_ADDR);
-    if (file)
+    ofstream out(DATA_FILE_ADDR);
+    if (!out.is_open())
     {
-        file << score;
-        file.close();
-        return true;
+        system("mkdir data");
+        system("mkdir data/games");
+        system("touch ./data/games/data");
+        out.open(DATA_FILE_ADDR);
+        if (!out.is_open())
+        {
+            return false;
+        }
     }
-    return false;
+    // data += "\n";
+    out << data;
+    out.close();
+    return true;
 }
 
 // void show_start_menu(SDL_Event* e){
@@ -1136,7 +1288,7 @@ int main(int argc, char *argv[])
         Uint32 SDL_flags = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
         Uint32 WND_flags = SDL_WINDOW_HIDDEN;
 
-        if (SDL_Init(SDL_flags) < 0 || TTF_Init() < 0 || IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG | IMG_INIT_TIF | IMG_INIT_WEBP) == 0)
+        if (SDL_Init(SDL_flags) < 0 || TTF_Init() < 0 || IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG) == 0)
         {
             printf("Error with SDL_Init: %s", SDL_GetError());
             return -1;
@@ -1159,9 +1311,15 @@ int main(int argc, char *argv[])
     SDL_Event *e = new SDL_Event;
     SDL_Point ball_center{WIDTH / 2, HEIGHT - BOTTOM_MARGIN};
     Ball ball(&ball_center, 20, 30, {240, 180, 200, 255}, 1);
-    Character l_char(m_renderer, e, {100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, 0, 0, 3);
-    Character r_char(m_renderer, e, {WIDTH - 100 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, 0, 1, 2);
-    l_char.set_keys(SDLK_d, SDLK_a, SDLK_w);
+    Character l_char(m_renderer, e, {100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, KICKFIRE, 0, 0, 3);
+    Character r_char(m_renderer, e, {WIDTH - 100 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, INVISIBLE_BALL, 0, 1, 2);
+    l_char.set_keys(SDLK_d, SDLK_a, SDLK_w, SDLK_s);
+    l_char.set_name("left");
+    r_char.set_name("right");
+    ProgressBar power_r(100, 0, {100, 200, 200, 255}, {240, 240, 255, 255}, {WIDTH - 300, HEIGHT - 75, 200, 30});
+    ProgressBar power_l(100, 0, {100, 200, 200, 255}, {240, 240, 255, 255}, {100, HEIGHT - 75, 200, 30});
+    Timer game_timer;
+    game_timer.pause();
 
     //-----====-Main game loop start-====-----
     while (Game_State != STATE_QUIT)
@@ -1176,11 +1334,47 @@ int main(int argc, char *argv[])
         }
         if (Game_State == STATE_GAMING)
         {
-            // ProgressBar power_l(100, 0, {100, 200, 200, 255}, {240, 240, 255, 255}, {100, HEIGHT - 150, 100, 30});
+            game_timer.play();
             r_char.render(m_renderer);
             l_char.render(m_renderer);
             ball.render(m_renderer);
-            // power_l.render(m_renderer);
+            power_l.render(m_renderer);
+            power_r.render(m_renderer);
+            power_r.set_value(r_char.get_power_precent());
+            power_l.set_value(l_char.get_power_precent());
+
+            if (ball_center.x > WIDTH - 100 || ball_center.x < 100)
+            {
+                if (ball_center.x > WIDTH - 200)
+                {
+                    l_char.add_goal();
+                    r_char.set_power_precent(r_char.get_power_precent() + 20);
+                }
+                else
+                {
+                    r_char.add_goal();
+                    l_char.set_power_precent(l_char.get_power_precent() + 20);
+                }
+                ball_center.x = WIDTH / 2;
+                ball.set_vy(0);
+                ball.set_vx(0);
+                ball_center.y = HEIGHT - BOTTOM_MARGIN;
+            }
+            render_text_center(m_renderer, l_char.get_name().c_str(), new SDL_Point{150, 50}, TTF_OpenFont(FONT_ADDR, 50), {255, 255, 220, 255});
+            render_text_center(m_renderer, r_char.get_name().c_str(), new SDL_Point{WIDTH - 150, 50}, TTF_OpenFont(FONT_ADDR, 50), {255, 255, 220, 255});
+            string score_board = to_string(l_char.get_num_of_goals());
+            string gtime = to_string(game_timer.get_time());
+
+            score_board += ":";
+            score_board += to_string(r_char.get_num_of_goals());
+
+            render_text_center(m_renderer, gtime.c_str(), new SDL_Point{WIDTH / 2, HEIGHT - 50}, TTF_OpenFont("score_board.ttf", 60), {240, 220, 220, 255});
+            render_text_center(m_renderer, score_board.c_str(), new SDL_Point{WIDTH / 2, 50}, TTF_OpenFont("score_board.ttf", 80), {240, 220, 220, 255});
+
+            if (game_timer.get_time() > 90 || l_char.get_num_of_goals() > 9 || r_char.get_num_of_goals() > 9)
+            {
+                Game_State = STATE_END_MENU;
+            }
         }
         if (Game_State == STATE_PAUSE_MENU)
         {
@@ -1191,6 +1385,7 @@ int main(int argc, char *argv[])
         if (Game_State == STATE_QUIT)
         {
         }
+
         //-----====-Checking for quit and other events-====-----
         SDL_PollEvent(e);
 
@@ -1200,7 +1395,7 @@ int main(int argc, char *argv[])
             Game_State = STATE_QUIT;
             break;
         }
-        SDL_SetRenderTarget(m_renderer , NULL);
+        SDL_SetRenderTarget(m_renderer, NULL);
         SDL_RenderPresent(m_renderer);
         SDL_Delay(DELAY);
     }
