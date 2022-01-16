@@ -155,7 +155,7 @@ typedef enum States
     STATE_GAMING,
     STATE_QUIT
 } States;
-States Game_State = STATE_GAMING;
+States Game_State = STATE_START_MENU;
 
 typedef enum Powers
 {
@@ -990,19 +990,9 @@ typedef struct Text
         font = TTF_OpenFont(font_addr.c_str(), ptsize);
     }
 
-    string get_text()
+    SDL_Rect render(SDL_Renderer *renderer, SDL_Point *center_point)
     {
-        return text;
-    }
-
-    void set_text(string new_text)
-    {
-        text = new_text;
-    }
-
-    SDL_Rect render(SDL_Renderer *renderer, SDL_Point *top_center_coordinates)
-    {
-        return render_text_center(renderer, text.c_str(), top_center_coordinates, font, color);
+        return render_text_center(renderer, text.c_str(), center_point, font, color);
     }
 
 } Text;
@@ -1014,7 +1004,7 @@ private:
     SDL_Rect bounds;
     SDL_Texture *back_texture = NULL;
     SDL_Color back_color{255, 255, 200, 255};
-    SDL_Color border_color{255, 200, 220, 255};
+    SDL_Color border_color{255, 100, 120, 255};
     bool enabled = false;
     SDL_Event *e = NULL;
 
@@ -1024,9 +1014,13 @@ private:
         if (SDL_GetMouseState(&x, &y) & SDL_BUTTON_LMASK)
         {
             if (SDL_PointInRect(new SDL_Point{x, y}, &bounds))
+            {
                 enabled = true;
+            }
             else
+            {
                 enabled = false;
+            }
         }
 
         if (enabled)
@@ -1072,10 +1066,11 @@ public:
         this->bounds = bounds;
         this->e = e;
     }
+    string get_text() { return ptext->text; }
     void render(SDL_Renderer *renderer)
     {
         read_keys_and_mouse(e);
-        SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
+        // SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
         if (back_texture == NULL)
         {
             back_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, bounds.w, bounds.h);
@@ -1091,10 +1086,10 @@ public:
         }
         SDL_SetRenderTarget(renderer, NULL);
         SDL_RenderCopy(renderer, back_texture, NULL, &bounds);
-        if (former_texture != NULL)
-        {
-            SDL_SetRenderTarget(renderer, former_texture);
-        }
+        // if (former_texture != NULL)
+        // {
+        //     SDL_SetRenderTarget(renderer, former_texture);
+        // }
         render_text_center(renderer, ptext->text.c_str(), new SDL_Point{bounds.x + bounds.w / 2, bounds.y + bounds.h / 2});
     }
 } TextBox;
@@ -1199,9 +1194,9 @@ public:
         SDL_PumpEvents();
         return (SDL_PointInRect(new SDL_Point{x, y}, &bounds) && (state & SDL_BUTTON_LMASK));
     }
-    void set_text(Text &text)
+    void set_text(string text)
     {
-        this->text = text;
+        this->text.text = text;
     }
     void render(SDL_Renderer *renderer, SDL_Rect *srcrect = NULL)
     {
@@ -1216,8 +1211,7 @@ public:
             SDL_SetRenderDrawColor(renderer, 250, 100, 0, 255);
             SDL_RenderDrawRect(renderer, &bounds);
         }
-
-        render_text_center(renderer, text.text.c_str(), new SDL_Point{bounds.w / 2 + bounds.x, bounds.h / 2 + bounds.y}, text.font, text.color);
+        text.render(renderer, new SDL_Point{bounds.w / 2 + bounds.x, bounds.h / 2 + bounds.y});
         SDL_SetRenderTarget(renderer, former_texture);
         former_texture = NULL;
     }
@@ -1243,6 +1237,25 @@ public:
 };
 
 typedef struct Button Button;
+
+void clear_window(SDL_Renderer *m_renderer)
+{
+    SDL_SetRenderTarget(m_renderer, NULL);
+    SDL_SetRenderDrawColor(m_renderer, 30, 40, 50, 255);
+    SDL_RenderClear(m_renderer);
+}
+
+void window_stuff(SDL_Renderer *m_renderer, SDL_Event *e)
+{
+    SDL_PollEvent(e);
+    if (e->type == SDL_QUIT)
+    {
+        Game_State = STATE_QUIT;
+    }
+    SDL_SetRenderTarget(m_renderer, NULL);
+    SDL_RenderPresent(m_renderer);
+    SDL_Delay(DELAY);
+}
 
 // bool read_games_from_file(vector<Game> &character)
 // {
@@ -1273,12 +1286,6 @@ bool write_game_to_file(string data)
     return true;
 }
 
-// void show_start_menu(SDL_Event* e){
-//     TextBox name1(NULL , {250 , 210, 180, 255} , SDL_Rect{100 , 100 , 200 , 60} , e);
-//     TextBox name2(NULL , {250 , 210, 180, 255} , SDL_Rect{WIDTH - 100 , 100 , 200 , 60} , e);
-
-// }
-
 int main(int argc, char *argv[])
 {
     SDL_Window *m_window = NULL;
@@ -1307,97 +1314,147 @@ int main(int argc, char *argv[])
         SDL_RenderPresent(m_renderer);
     }
 
-    //-----====-Create main elements-====-----
     SDL_Event *e = new SDL_Event;
-    SDL_Point ball_center{WIDTH / 2, HEIGHT - BOTTOM_MARGIN};
-    Ball ball(&ball_center, 20, 30, {240, 180, 200, 255}, 1);
-    Character l_char(m_renderer, e, {100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, KICKFIRE, 0, 0, 3);
-    Character r_char(m_renderer, e, {WIDTH - 100 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, INVISIBLE_BALL, 0, 1, 2);
-    l_char.set_keys(SDLK_d, SDLK_a, SDLK_w, SDLK_s);
-    l_char.set_name("left");
-    r_char.set_name("right");
-    ProgressBar power_r(100, 0, {100, 200, 200, 255}, {240, 240, 255, 255}, {WIDTH - 300, HEIGHT - 75, 200, 30});
-    ProgressBar power_l(100, 0, {100, 200, 200, 255}, {240, 240, 255, 255}, {100, HEIGHT - 75, 200, 30});
-    Timer game_timer;
-    game_timer.pause();
-
+    srand(time(nullptr));
+    string l_char_name = "";
+    string r_char_name = "";
     //-----====-Main game loop start-====-----
-    while (Game_State != STATE_QUIT)
+    while (1)
     {
-
-        SDL_SetRenderTarget(m_renderer, NULL);
-        SDL_SetRenderDrawColor(m_renderer, 30, 40, 50, 255);
-        SDL_RenderClear(m_renderer);
+        window_stuff(m_renderer, e);
 
         if (Game_State == STATE_START_MENU)
         {
+            // Initialization
+
+            Button btn_next(m_renderer, SDL_Color{140, 240, 150, 255}, SDL_Rect{WIDTH / 2 - 100, 600, 200, 60});
+            TextBox r_ch_tb(NULL, SDL_Color{220, 200, 180, 255}, {800, 200, 200, 80}, e);
+            TextBox l_ch_tb(NULL, SDL_Color{220, 200, 180, 255}, {200, 200, 200, 80}, e);
+            btn_next.set_text("Next");
+
+            // Loop
+            while (Game_State == STATE_START_MENU)
+            {
+                clear_window(m_renderer);
+
+                btn_next.render(m_renderer);
+                r_ch_tb.render(m_renderer);
+                l_ch_tb.render(m_renderer);
+
+                if (btn_next.is_clicked())
+                {
+                    Game_State = STATE_GAMING;
+                    l_char_name = l_ch_tb.get_text();
+                    r_char_name = r_ch_tb.get_text();
+                }
+                window_stuff(m_renderer, e);
+            }
         }
         if (Game_State == STATE_GAMING)
         {
-            game_timer.play();
-            r_char.render(m_renderer);
-            l_char.render(m_renderer);
-            ball.render(m_renderer);
-            power_l.render(m_renderer);
-            power_r.render(m_renderer);
-            power_r.set_value(r_char.get_power_precent());
-            power_l.set_value(l_char.get_power_precent());
+            // initialization
+            SDL_Point ball_center{WIDTH / 2, HEIGHT - BOTTOM_MARGIN};
+            Ball ball(&ball_center, 20, 30, {240, 180, 200, 255}, 1);
 
-            if (ball_center.x > WIDTH - 100 || ball_center.x < 100)
+            Character l_char(m_renderer, e, {100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, static_cast<Powers>(rand() % 3), 0, 0, 3);
+            Character r_char(m_renderer, e, {WIDTH - 100 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, static_cast<Powers>(rand() % 3), 0, 1, 2);
+            l_char.set_keys(SDLK_d, SDLK_a, SDLK_w, SDLK_s);
+            l_char.set_name(l_char_name);
+            r_char.set_name(r_char_name);
+            ProgressBar power_r(100, 0, {100, 200, 200, 255}, {240, 240, 255, 255}, {WIDTH - 300, HEIGHT - 75, 200, 30});
+            ProgressBar power_l(100, 0, {100, 200, 200, 255}, {240, 240, 255, 255}, {100, HEIGHT - 75, 200, 30});
+            Timer game_timer;
+            game_timer.pause();
+            // loop
+            while (Game_State == STATE_GAMING)
             {
-                if (ball_center.x > WIDTH - 200)
+                clear_window(m_renderer);
+                game_timer.play();
+                r_char.render(m_renderer);
+                l_char.render(m_renderer);
+                ball.render(m_renderer);
+                power_l.render(m_renderer);
+                power_r.render(m_renderer);
+                power_r.set_value(r_char.get_power_precent());
+                power_l.set_value(l_char.get_power_precent());
+
+                // Check for goals
+                if (ball_center.x > WIDTH - 100 || ball_center.x < 100)
                 {
-                    l_char.add_goal();
-                    r_char.set_power_precent(r_char.get_power_precent() + 20);
+                    if (ball_center.x > WIDTH - 200)
+                    {
+                        l_char.add_goal();
+                        r_char.set_power_precent(r_char.get_power_precent() + 20);
+                    }
+                    else
+                    {
+                        r_char.add_goal();
+                        l_char.set_power_precent(l_char.get_power_precent() + 20);
+                    }
+                    ball_center.x = WIDTH / 2;
+                    ball.set_vy(0);
+                    ball.set_vx(0);
+                    ball_center.y = HEIGHT - BOTTOM_MARGIN;
                 }
-                else
+                // Display names and goals and power bar
+                render_text_center(m_renderer, l_char.get_name().c_str(), new SDL_Point{150, 50}, TTF_OpenFont(FONT_ADDR, 50), {255, 255, 220, 255});
+                render_text_center(m_renderer, r_char.get_name().c_str(), new SDL_Point{WIDTH - 150, 50}, TTF_OpenFont(FONT_ADDR, 50), {255, 255, 220, 255});
+                string score_board = to_string(l_char.get_num_of_goals());
+                string gtime = to_string(game_timer.get_time());
+
+                score_board += ":";
+                score_board += to_string(r_char.get_num_of_goals());
+
+                render_text_center(m_renderer, gtime.c_str(), new SDL_Point{WIDTH / 2, HEIGHT - 50}, TTF_OpenFont("score_board.ttf", 60), {240, 220, 220, 255});
+                render_text_center(m_renderer, score_board.c_str(), new SDL_Point{WIDTH / 2, 50}, TTF_OpenFont("score_board.ttf", 80), {240, 220, 220, 255});
+
+                // Check for end
+                if (game_timer.get_time() > 90 || l_char.get_num_of_goals() > 9 || r_char.get_num_of_goals() > 9)
                 {
-                    r_char.add_goal();
-                    l_char.set_power_precent(l_char.get_power_precent() + 20);
+                    Game_State = STATE_END_MENU;
                 }
-                ball_center.x = WIDTH / 2;
-                ball.set_vy(0);
-                ball.set_vx(0);
-                ball_center.y = HEIGHT - BOTTOM_MARGIN;
-            }
-            render_text_center(m_renderer, l_char.get_name().c_str(), new SDL_Point{150, 50}, TTF_OpenFont(FONT_ADDR, 50), {255, 255, 220, 255});
-            render_text_center(m_renderer, r_char.get_name().c_str(), new SDL_Point{WIDTH - 150, 50}, TTF_OpenFont(FONT_ADDR, 50), {255, 255, 220, 255});
-            string score_board = to_string(l_char.get_num_of_goals());
-            string gtime = to_string(game_timer.get_time());
 
-            score_board += ":";
-            score_board += to_string(r_char.get_num_of_goals());
-
-            render_text_center(m_renderer, gtime.c_str(), new SDL_Point{WIDTH / 2, HEIGHT - 50}, TTF_OpenFont("score_board.ttf", 60), {240, 220, 220, 255});
-            render_text_center(m_renderer, score_board.c_str(), new SDL_Point{WIDTH / 2, 50}, TTF_OpenFont("score_board.ttf", 80), {240, 220, 220, 255});
-
-            if (game_timer.get_time() > 90 || l_char.get_num_of_goals() > 9 || r_char.get_num_of_goals() > 9)
-            {
-                Game_State = STATE_END_MENU;
+                window_stuff(m_renderer, e);
             }
         }
         if (Game_State == STATE_PAUSE_MENU)
         {
+
+            while (Game_State == STATE_PAUSE_MENU)
+            {
+                clear_window(m_renderer);
+                window_stuff(m_renderer, e);
+            }
         }
         if (Game_State == STATE_END_MENU)
         {
+
+            while (Game_State == STATE_END_MENU)
+            {
+                clear_window(m_renderer);
+                Game_State = STATE_QUIT;
+                window_stuff(m_renderer, e);
+            }
         }
         if (Game_State == STATE_QUIT)
         {
+            Timer time;
+            time.set_alarm(3);
+            while (Game_State == STATE_QUIT)
+            {
+                clear_window(m_renderer);
+                render_text_center(m_renderer, "Thank you!", new SDL_Point{WIDTH / 2, HEIGHT / 2}, TTF_OpenFont(FONT_ADDR, 70), {250, 255, 220, 255});
+                if (time.check_alarm())
+                {
+                    break;
+                }
+                window_stuff(m_renderer , e);
+            }
+            if (time.check_alarm())
+            {
+                break;
+            }
         }
-
-        //-----====-Checking for quit and other events-====-----
-        SDL_PollEvent(e);
-
-        switch (e->type)
-        {
-        case SDL_QUIT:
-            Game_State = STATE_QUIT;
-            break;
-        }
-        SDL_SetRenderTarget(m_renderer, NULL);
-        SDL_RenderPresent(m_renderer);
-        SDL_Delay(DELAY);
     }
 
     // Finalize and free resources
