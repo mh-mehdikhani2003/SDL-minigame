@@ -46,12 +46,12 @@
 using namespace std;
 
 //-----===== OK! Tested ====-----
-bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, Uint16 height, const char *image_address, SDL_Rect *srcrect = NULL, SDL_Rect *dstrect = NULL)
+SDL_Rect draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, Uint16 height, const char *image_address, SDL_Rect *srcrect = NULL, SDL_Rect *dstrect = NULL)
 {
     SDL_Surface *surf = IMG_Load(image_address);
     if (!surf)
     {
-        return false;
+        return {-1, -1, -1, -1};
     }
 
     float scale = (float)height / (float)surf->h;
@@ -61,7 +61,7 @@ bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, Uint16 
     if (!texture)
     {
         SDL_FreeSurface(surf);
-        return false;
+        return {-1, -1, -1, -1};
     }
     SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
     SDL_SetRenderTarget(renderer, NULL);
@@ -71,7 +71,14 @@ bool draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, Uint16 
     SDL_DestroyTexture(texture);
     SDL_SetRenderTarget(renderer, former_texture);
     former_texture = NULL;
-    return true;
+    if (dstrect != NULL)
+    {
+        return *dstrect;
+    }
+    else
+    {
+        return rect;
+    }
 }
 
 //----==== OK! Tested ====-----
@@ -133,21 +140,56 @@ SDL_Rect render_text_left(SDL_Renderer *renderer, const char *text, SDL_Point *l
     return result;
 }
 
+bool rect_in_intersect(SDL_Rect first, SDL_Rect second)
+{
+    if (first.x > second.x + second.w)
+    {
+        return false;
+    }
+    if (first.x + first.w < second.x)
+    {
+        return false;
+    }
+    if (first.y > second.y + second.h)
+    {
+        return false;
+    }
+    if (first.y + first.h < second.y)
+    {
+        return false;
+    }
+    return true;
+}
+
 int check_for_collision(SDL_Rect first, SDL_Rect second)
 {
-    if (SDL_HasIntersection(&first, &second))
+    if (rect_in_intersect(first, second) == SDL_TRUE)
     {
+
         if (second.x - first.x > 0 && second.x - first.x < first.w)
             return 1;
         if (first.x - second.x > 0 && first.x - second.x < second.w)
             return 3;
-
-        if (second.y - first.y > 0 && second.y - first.y < first.h)
-            return 0;
         if (first.y - second.y > 0 && first.y - second.y < second.h)
-        {
+            return 0;
+        if (second.y - first.y > 0 && second.y - first.y < first.h)
             return 2;
-        }
+    }
+    return -1;
+}
+int check_for_collision_goal(SDL_Rect first, SDL_Rect second)
+{
+    if (rect_in_intersect(first, second) == SDL_TRUE)
+    {
+
+        if (first.y - second.y > 0 && first.y - second.y < second.h)
+            return 0;
+        if (second.y - first.y > 0 && second.y - first.y < first.h)
+            return 2;
+        if (second.x - first.x > 0 && second.x - first.x < first.w)
+            return 1;
+        if (first.x - second.x > 0 && first.x - second.x < second.w)
+            return 3;
     }
     return -1;
 }
@@ -569,21 +611,25 @@ private:
             ball->set_vx(dx - ball->get_vx());
             if (collision == 1)
             {
-                ball->set_x(r.x + r.w + ball->get_r());
+                ball->set_x(r.x + r.w + ball->get_r() + 10);
             }
             if (collision == 3)
             {
-                ball->set_x(r.x - ball->get_r());
+                ball->set_x(r.x - ball->get_r() - 10);
             }
             if (collision == 0)
             {
-                ball->set_y(r.y - ball->get_r());
+                ball->set_y(r.y - ball->get_r() - 10);
             }
-            if (collision == 2)
-            {
-                ball->set_y(r.y + ball->get_r());
-            }
+            // if (collision == 2)
+            // {
+            //     ball->set_y(r.y + ball->get_r());
+            // }
             ball->set_vy(dy - ball->get_vy());
+            // if (type == CHARACTER_RIGHT)
+            //     ball->set_x(bounds.x - ball->get_r() - 10);
+            // else
+            //     ball->set_x(bounds.x + ball->get_r() + 10);
             if (name != ball->get_power_owner())
             {
                 switch (ball->get_power())
@@ -662,7 +708,7 @@ private:
                 {
                     ball->set_vx(dx - ball->get_vx() * 0.95);
                     ball->set_vy(dy + 30);
-                    ball->set_x(r.x + r.w + ball->get_r());
+                    ball->set_x(r.x + r.w + ball->get_r() + 10);
                 }
             }
             if (collision == 3)
@@ -671,20 +717,15 @@ private:
                 {
                     ball->set_vx(dx - ball->get_vx() * 0.95);
                     ball->set_vy(dy + 30);
-                    ball->set_x(r.x - ball->get_r() - 5);
+                    ball->set_x(r.x - ball->get_r() - 10);
                 }
             }
-            if (collision == 0)
+            else if (collision == 2)
             {
-                ball->set_vx(dx - (ball->get_vx() + ball->get_vy()) / 2);
-                ball->set_vy(dx - (ball->get_vx() + ball->get_vy()) / 2);
-                ball->set_y(r.y - ball->get_r());
-            }
-            if (collision == 2)
-            {
-                ball->set_vx(dx + (ball->get_vx() + ball->get_vy()) / 2);
-                ball->set_vy(dx - (ball->get_vx() + ball->get_vy()) / 2);
-                ball->set_y(r.y + ball->get_r());
+                ball->set_vx(dx + ball->get_vx() + 15);
+                ball->set_vy(dy - ball->get_vy());
+                ball->set_y(r.y + ball->get_r() + 5);
+                ball->set_x(ball->get_x() + 5);
             }
             if (name != ball->get_power_owner())
             {
@@ -869,7 +910,9 @@ public:
         head_rect.h *= head_ratio;
         head_rect.w *= head_ratio;
     }
-
+    int get_goals() { return num_of_goals; }
+    void set_goals(int goal) { num_of_goals = goal; }
+    void set_x(int x) { bounds.x = x; }
     int get_max_head_model() { return head_models_number; }
     SDL_Rect get_bounds() { return bounds; }
     ~Character()
@@ -1361,6 +1404,10 @@ int main(int argc, char *argv[])
     while (1)
     {
         window_stuff(m_renderer, e);
+        l_char.set_goals(0);
+        r_char.set_goals(0);
+        r_char.set_x(WIDTH - 200 - 100);
+        l_char.set_x(200);
 
         if (Game_State == STATE_START_MENU)
         {
@@ -1413,7 +1460,9 @@ int main(int argc, char *argv[])
                 {
                     if (btn_next.is_clicked())
                     {
-                        while(btn_next.is_clicked()){}
+                        while (btn_next.is_clicked())
+                        {
+                        }
                         Game_State = STATE_SELECT_BALL;
                         l_char.set_name(l_ch_tb.get_text());
                         r_char.set_name(r_ch_tb.get_text());
@@ -1482,9 +1531,8 @@ int main(int argc, char *argv[])
                 {
                     while (next_level.is_clicked())
                     {
-                    
                     }
-                    
+
                     ball.set_model(current_model);
                     Game_State = STATE_SELECT_CHAR;
                 }
@@ -1497,7 +1545,7 @@ int main(int argc, char *argv[])
             Button next_level(m_renderer, SDL_Color{140, 240, 150, 255}, SDL_Rect{WIDTH / 2 - 100, 600, 200, 60});
             Button l_h_i(m_renderer, SDL_Color{100, 200, 250, 255}, SDL_Rect{100, 600, 60, 60});
             Button l_h_d(m_renderer, SDL_Color{100, 200, 250, 255}, SDL_Rect{345, 600, 60, 60});
-            
+
             Button r_h_i(m_renderer, SDL_Color{100, 200, 250, 255}, SDL_Rect{WIDTH - 100 - 60, 600, 60, 60});
             Button r_h_d(m_renderer, SDL_Color{100, 200, 250, 255}, SDL_Rect{WIDTH - 345 - 60, 600, 60, 60});
 
@@ -1524,7 +1572,8 @@ int main(int argc, char *argv[])
 
                 if (l_h_i.is_clicked())
                 {
-                    while (l_h_i.is_clicked());
+                    while (l_h_i.is_clicked())
+                        ;
 
                     l_head_model += 2;
                     if (l_head_model >= l_char.get_max_head_model() * 2)
@@ -1536,7 +1585,8 @@ int main(int argc, char *argv[])
 
                 if (l_h_d.is_clicked())
                 {
-                    while (l_h_d.is_clicked());
+                    while (l_h_d.is_clicked())
+                        ;
 
                     l_head_model -= 2;
                     if (l_head_model < 1)
@@ -1545,10 +1595,11 @@ int main(int argc, char *argv[])
                     }
                     l_char.set_head_model(l_head_model, m_renderer);
                 }
-                
+
                 if (r_h_i.is_clicked())
                 {
-                    while (r_h_i.is_clicked());
+                    while (r_h_i.is_clicked())
+                        ;
 
                     r_head_model += 2;
                     if (r_head_model >= r_char.get_max_head_model() * 2)
@@ -1560,7 +1611,8 @@ int main(int argc, char *argv[])
 
                 if (r_h_d.is_clicked())
                 {
-                    while (r_h_d.is_clicked());
+                    while (r_h_d.is_clicked())
+                        ;
 
                     r_head_model -= 2;
                     if (r_head_model <= 0)
@@ -1569,11 +1621,12 @@ int main(int argc, char *argv[])
                     }
                     r_char.set_head_model(r_head_model, m_renderer);
                 }
-                
-                if(next_level.is_clicked()){
+
+                if (next_level.is_clicked())
+                {
                     Game_State = STATE_GAMING;
                 }
-                
+
                 window_stuff(m_renderer, e);
             }
         }
@@ -1595,11 +1648,25 @@ int main(int argc, char *argv[])
                 ball.render(m_renderer);
                 power_l.render(m_renderer);
                 power_r.render(m_renderer);
+                SDL_Rect l = draw_image_on_point(m_renderer, SDL_Point{75, 750 - BOTTOM_MARGIN - 20}, 160, "raw/field/goals/l.png");
+                SDL_Rect r = draw_image_on_point(m_renderer, SDL_Point{WIDTH - 75, 750 - BOTTOM_MARGIN - 20}, 160, "raw/field/goals/r.png");
                 power_r.set_value(r_char.get_power_precent());
                 power_l.set_value(l_char.get_power_precent());
 
+                
+                if (check_for_collision_goal(l, ball.get_bounds()) == 0)
+                {
+                    ball_center.y = l.y - ball.get_r();
+                    ball.set_vy(-ball.get_vy());
+                }
+                if (check_for_collision_goal(r, ball.get_bounds()) == 0)
+                {
+                    ball_center.y = r.y - ball.get_r();
+                    ball.set_vy(-ball.get_vy());
+                }
+
                 // Check for goals
-                if (ball_center.x > WIDTH - 100 || ball_center.x < 100)
+                if ((ball_center.x > WIDTH - 115 || ball_center.x < 115) && ball_center.y > HEIGHT - BOTTOM_MARGIN - 160 - 20)
                 {
                     if (ball_center.x > WIDTH - 200)
                     {
@@ -1611,11 +1678,13 @@ int main(int argc, char *argv[])
                         r_char.add_goal();
                         l_char.set_power_precent(l_char.get_power_precent() + 20);
                     }
+
                     ball_center.x = WIDTH / 2;
                     ball.set_vy(0);
                     ball.set_vx(0);
                     ball_center.y = HEIGHT - BOTTOM_MARGIN;
                 }
+
                 // Display names and goals and power bar
                 render_text_center(m_renderer, l_char.get_name().c_str(), new SDL_Point{150, 50}, names_font, {255, 255, 220, 255});
                 render_text_center(m_renderer, r_char.get_name().c_str(), new SDL_Point{WIDTH - 150, 50}, names_font, {255, 255, 220, 255});
@@ -1661,15 +1730,18 @@ int main(int argc, char *argv[])
                 replay_btn.render(m_renderer);
                 main_btn.render(m_renderer);
                 quit_btn.render(m_renderer);
-
+                //Bug---->>>>
                 if (main_btn.is_clicked())
                 {
                     Game_State = STATE_START_MENU;
                 }
                 if (replay_btn.is_clicked())
                 {
+                    l_char.set_goals(0);
+                    r_char.set_goals(0);
                     Game_State = STATE_GAMING;
                 }
+
                 if (quit_btn.is_clicked())
                 {
                     Game_State = STATE_QUIT;
