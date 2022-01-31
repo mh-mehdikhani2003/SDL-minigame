@@ -81,6 +81,27 @@ SDL_Rect draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, Uin
     }
 }
 
+void load_image_on_texture(SDL_Renderer *renderer, const char *address, SDL_Texture *dst)
+{
+    SDL_Surface *surf = IMG_Load(address);
+    dst = SDL_CreateTextureFromSurface(renderer, surf);
+    SDL_FreeSurface(surf);
+}
+
+SDL_Rect draw_texture_on_texture(SDL_Renderer *renderer, SDL_Texture *dst, SDL_Texture *src, SDL_Point center_point, Uint16 height)
+{
+    SDL_Rect dst_rect{0, 0, 1, 1};
+    SDL_QueryTexture(src, NULL, NULL, &dst_rect.w, &dst_rect.h);
+
+    dst_rect.w = ((float)height / (float)dst_rect.h) * dst_rect.w;
+    dst_rect.h = height;
+    dst_rect.x = center_point.x - dst_rect.w / 2;
+    dst_rect.y = center_point.y - dst_rect.h / 2;
+
+    SDL_SetRenderTarget(renderer, dst);
+    SDL_RenderCopy(renderer, src, NULL, &dst_rect);
+    return dst_rect;
+}
 //----==== OK! Tested ====-----
 TTF_Font *gfont = NULL;
 SDL_Rect render_text_center(SDL_Renderer *renderer, const char *text, SDL_Point *center_point, TTF_Font *font = NULL, SDL_Color color = {0, 0, 0, 255})
@@ -161,19 +182,45 @@ bool rect_in_intersect(SDL_Rect first, SDL_Rect second)
     return true;
 }
 
+// int check_for_collision(SDL_Rect first, SDL_Rect second)
+// {
+//     if (rect_in_intersect(first, second) == SDL_TRUE)
+//     {
+
+//         if (second.x - first.x > 0 && second.x - first.x < first.w)
+//             return 1;
+//         if (first.x - second.x > 0 && first.x - second.x < second.w)
+//             return 3;
+//         if (first.y - second.y > 0 && first.y - second.y < second.h)
+//             return 0;
+//         if (second.y - first.y > 0 && second.y - first.y < first.h)
+//             return 2;
+//     }
+//     return -1;
+// }
 int check_for_collision(SDL_Rect first, SDL_Rect second)
 {
     if (rect_in_intersect(first, second) == SDL_TRUE)
     {
+        SDL_Rect intsct{0, 0, 0, 0};
+        SDL_IntersectRect(&first, &second, &intsct);
 
-        if (second.x - first.x > 0 && second.x - first.x < first.w)
-            return 1;
-        if (first.x - second.x > 0 && first.x - second.x < second.w)
+        if (intsct.w >= intsct.h)
+        {
+            if (intsct.y == first.y)
+            {
+                return 0;
+            }
+            if (intsct.y > first.y)
+            {
+                return 2;
+            }
+        }
+        if (intsct.x == first.x)
+        {
             return 3;
-        if (first.y - second.y > 0 && first.y - second.y < second.h)
-            return 0;
-        if (second.y - first.y > 0 && second.y - first.y < first.h)
-            return 2;
+        }
+        return 1;
     }
     return -1;
 }
@@ -839,13 +886,8 @@ public:
 
         if (mode != CONFUSED)
         {
-            if (!ball_foot_collision())
-            {
-                if (!ball_head_colision())
-                {
-                    ball_body_collision();
-                }
-            }
+            ball_foot_collision();
+            ball_head_colision();
         }
         else
         {
@@ -1638,28 +1680,42 @@ int main(int argc, char *argv[])
 
             Timer game_timer;
             game_timer.pause();
+
+            SDL_Surface *surf = IMG_Load("raw/field/goals/l.png");
+            SDL_Texture* goal_l = SDL_CreateTextureFromSurface(m_renderer, surf);
+
+
+            surf = IMG_Load("raw/field/goals/r.png");
+            SDL_Texture *goal_r = SDL_CreateTextureFromSurface(m_renderer, surf);
+
+            surf = IMG_Load("raw/field/crowd.png");
+            SDL_Texture *crowd = SDL_CreateTextureFromSurface(m_renderer, surf);
+            SDL_FreeSurface(surf);
+
             // loop
             while (Game_State == STATE_GAMING)
             {
                 clear_window(m_renderer);
                 game_timer.play();
+                draw_texture_on_texture(m_renderer, NULL, crowd, {WIDTH / 2, HEIGHT / 2}, HEIGHT - 500);
                 r_char.render(m_renderer);
                 l_char.render(m_renderer);
                 ball.render(m_renderer);
                 power_l.render(m_renderer);
                 power_r.render(m_renderer);
-                SDL_Rect l = draw_image_on_point(m_renderer, SDL_Point{75, 750 - BOTTOM_MARGIN - 20}, 160, "raw/field/goals/l.png");
-                SDL_Rect r = draw_image_on_point(m_renderer, SDL_Point{WIDTH - 75, 750 - BOTTOM_MARGIN - 20}, 160, "raw/field/goals/r.png");
+                SDL_Rect l = draw_texture_on_texture(m_renderer, NULL, goal_l, SDL_Point{75, 750 - BOTTOM_MARGIN - 20}, 160);
+                SDL_Rect r = draw_texture_on_texture(m_renderer, NULL, goal_r, SDL_Point{WIDTH - 75, 750 - BOTTOM_MARGIN - 20}, 160);
+                // SDL_RenderCopy(m_renderer , goal_l , NULL , SDL_Rect{});
+
                 power_r.set_value(r_char.get_power_precent());
                 power_l.set_value(l_char.get_power_precent());
 
-                
-                if (check_for_collision_goal(l, ball.get_bounds()) == 0)
+                if (check_for_collision(l, ball.get_bounds()) == 0)
                 {
                     ball_center.y = l.y - ball.get_r();
                     ball.set_vy(-ball.get_vy());
                 }
-                if (check_for_collision_goal(r, ball.get_bounds()) == 0)
+                if (check_for_collision(r, ball.get_bounds()) == 0)
                 {
                     ball_center.y = r.y - ball.get_r();
                     ball.set_vy(-ball.get_vy());
@@ -1705,6 +1761,9 @@ int main(int argc, char *argv[])
 
                 window_stuff(m_renderer, e);
             }
+            SDL_DestroyTexture(goal_l);
+            SDL_DestroyTexture(goal_r);
+            SDL_DestroyTexture(crowd);
         }
         if (Game_State == STATE_PAUSE_MENU)
         {
