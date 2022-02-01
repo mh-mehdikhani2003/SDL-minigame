@@ -182,22 +182,6 @@ bool rect_in_intersect(SDL_Rect first, SDL_Rect second)
     return true;
 }
 
-// int check_for_collision(SDL_Rect first, SDL_Rect second)
-// {
-//     if (rect_in_intersect(first, second) == SDL_TRUE)
-//     {
-
-//         if (second.x - first.x > 0 && second.x - first.x < first.w)
-//             return 1;
-//         if (first.x - second.x > 0 && first.x - second.x < second.w)
-//             return 3;
-//         if (first.y - second.y > 0 && first.y - second.y < second.h)
-//             return 0;
-//         if (second.y - first.y > 0 && second.y - first.y < first.h)
-//             return 2;
-//     }
-//     return -1;
-// }
 int check_for_collision(SDL_Rect first, SDL_Rect second)
 {
     if (rect_in_intersect(first, second) == SDL_TRUE)
@@ -240,9 +224,11 @@ int check_for_collision_goal(SDL_Rect first, SDL_Rect second)
     }
     return -1;
 }
+
 typedef enum States
 {
     STATE_START_MENU,
+    STATE_SETTING,
     STATE_GET_NAMES,
     STATE_SELECT_BALL,
     STATE_SELECT_CHAR,
@@ -270,6 +256,8 @@ private:
     int vx = 0;
     int vy = 0;
     Uint8 ay = GRAVITY;
+
+    bool freezed = false;
 
     Powers power = NONE;
     string power_owner = "";
@@ -314,53 +302,58 @@ public:
     {
         current_model = new_model;
     }
+    void freez() { freezed = true; }
+    void unfreez() { freezed = false; }
     void render(SDL_Renderer *renderer)
     {
         int x = pcenter->x;
         int y = pcenter->y;
-        if (vx > MAX_VELOCITY)
+        if (!freezed)
         {
-            vx = MAX_VELOCITY;
-        }
-        if (vy > MAX_VELOCITY || vy < -MAX_VELOCITY)
-        {
-            // vy = MAX_VELOCITY * (vy > 0 ? 1 : -1);
-        }
-        vy += ay;
-        pcenter->x += vx;
-        pcenter->y += vy;
-        if (pcenter->y + r > HEIGHT - BOTTOM_MARGIN)
-        {
-            vy *= -0.9;
-            pcenter->y = HEIGHT - BOTTOM_MARGIN - r;
-        }
-        if (pcenter->x < r)
-        {
-            vx *= -1;
-            pcenter->x = r;
-        }
-        if (pcenter->x + r > WIDTH)
-        {
-            vx *= -1;
-            pcenter->x = WIDTH - r;
-        }
-        current_number_cntr++;
-        if (current_number_cntr >= pictures_cnt)
-        {
-            current_number++;
-            current_number_cntr = 0;
-            if (current_number >= pictures_cnt)
+            if (vx > MAX_VELOCITY)
+            {
+                vx = MAX_VELOCITY;
+            }
+            if (vy > MAX_VELOCITY || vy < -MAX_VELOCITY)
+            {
+                // vy = MAX_VELOCITY * (vy > 0 ? 1 : -1);
+            }
+            vy += ay;
+            pcenter->x += vx;
+            pcenter->y += vy;
+            if (pcenter->y + r > HEIGHT - BOTTOM_MARGIN)
+            {
+                vy *= -0.9;
+                pcenter->y = HEIGHT - BOTTOM_MARGIN - r;
+            }
+            if (pcenter->x < r)
+            {
+                vx *= -1;
+                pcenter->x = r;
+            }
+            if (pcenter->x + r > WIDTH)
+            {
+                vx *= -1;
+                pcenter->x = WIDTH - r;
+            }
+            current_number_cntr++;
+            if (current_number_cntr >= pictures_cnt)
+            {
+                current_number++;
+                current_number_cntr = 0;
+                if (current_number >= pictures_cnt)
+                {
+                    current_number = 0;
+                }
+            }
+            if (vy < -1000)
+            {
+                vy = -1000;
+            }
+            if (vx == 0)
             {
                 current_number = 0;
             }
-        }
-        if (vy < -1000)
-        {
-            vy = -1000;
-        }
-        if (vx == 0)
-        {
-            current_number = 0;
         }
         if (power != INVISIBLE_BALL)
         {
@@ -444,7 +437,6 @@ private:
     Ball *ball = NULL;
     Char_types type = CHARACTER_RIGHT;
     Char_modes mode = NORMAL;
-    int body_number = 0;
     int head_number = 0;
 
     Uint8 num_of_goals = 0;
@@ -456,19 +448,17 @@ private:
     int shoes_model = 0;
     const static int shoes_cnt = 4;
     const static int conf_pics_cnt = 2;
-    const int head_models_number = 2;
+    const int head_models_number = 7;
 
     int current_conf_pic = 0;
 
     const char *head_root = "./raw/Char/heads/";
-    const char *body_root = "./raw/Char/bodies/";
     const char *shoes_root = "./raw/Char/shoes/";
     const char *conf_pics_root = "./raw/Char/confusing/";
 
     Uint32 conf_time = 0;
 
     float head_to_height_ratio = 0.75;
-    float body_to_height_ratio = 0;
     float shoes_to_height_ratio = 0.25;
 
     const int x_speed = 20;
@@ -484,9 +474,8 @@ private:
     SDL_Rect bounds{0, 0, 0, 0};
     SDL_Texture *back_texture = NULL;
     SDL_Texture *head_texture = NULL;
-    SDL_Texture *body_texture = NULL;
     SDL_Texture *shoes_textures[shoes_cnt] = {NULL};
-    SDL_Rect body_rect{0, 0, 0, 0};
+
     SDL_Rect head_rect{0, 0, 0, 0};
     SDL_Rect shoes_rects[shoes_cnt];
 
@@ -497,27 +486,17 @@ private:
         head_rect.h *= head_ratio;
         head_rect.w *= head_ratio;
 
-        float body_ratio = (h * body_to_height_ratio) / body_rect.h;
-        body_rect.h *= body_ratio;
-        body_rect.w *= body_ratio;
-        body_rect.y = bounds.y + head_rect.h;
-
         float shoes_ratio = (h * shoes_to_height_ratio) / shoes_rects[0].h;
 
         for (int i = 0; i < shoes_cnt; i++)
         {
             shoes_rects[i].h *= shoes_ratio;
             shoes_rects[i].w *= shoes_ratio;
-            shoes_rects[i].y = body_rect.y + body_rect.h;
+            shoes_rects[i].y = head_rect.y + head_rect.h;
         }
     }
     void fill_textures(SDL_Renderer *renderer)
     {
-        SDL_Surface *body_img = IMG_Load(create_body_and_head_address(body_root, body_number).c_str());
-        body_texture = SDL_CreateTextureFromSurface(renderer, body_img);
-        body_rect = body_img->clip_rect;
-        SDL_FreeSurface(body_img);
-
         SDL_Surface *head_img = IMG_Load(create_body_and_head_address(head_root, head_number).c_str());
         head_texture = SDL_CreateTextureFromSurface(renderer, head_img);
         head_rect = head_img->clip_rect;
@@ -552,16 +531,11 @@ private:
         if (head_rect.x != 0 || head_rect.y != 0)
             SDL_RenderCopy(renderer, head_texture, NULL, &head_rect);
     }
-    void render_body(SDL_Renderer *renderer)
-    {
-        SDL_Point dstpoint = {bounds.x + bounds.w / 2, bounds.y + head_rect.h + body_rect.h / 2};
-        SDL_RenderCopy(renderer, body_texture, NULL, &body_rect);
-    }
     void render_foot(SDL_Renderer *renderer)
     {
         SDL_Point dstpoint{0, 0};
         dstpoint.x = bounds.x + bounds.w / 2;
-        dstpoint.y = bounds.y + head_rect.h + body_rect.h + shoes_rects[shoes_current_number].h / 2;
+        dstpoint.y = bounds.y + head_rect.h + shoes_rects[shoes_current_number].h / 2;
         SDL_RenderCopy(renderer, shoes_textures[shoes_current_number], NULL, &shoes_rects[shoes_current_number]);
     }
     string create_shoes_address(int model, int number)
@@ -625,7 +599,7 @@ private:
                 SDL_Rect &r = shoes_rects[shoes_current_number];
                 if (power_percent >= 100 && SDL_PointInRect(new SDL_Point{ball->get_x(), ball->get_y()}, new SDL_Rect{r.x - 50, r.y - 50, r.w + 100, r.h + 100}))
                 {
-                    ball->set_power(power, name);
+                    ball->set_power((power == THIEF ? static_cast<Powers>(rand()%3) : power), name);
                     power_percent = 0;
                 }
             }
@@ -655,73 +629,29 @@ private:
         int collision = check_for_collision(r, ball->get_bounds());
         if (collision >= 0)
         {
-            ball->set_vx(dx - ball->get_vx());
-            if (collision == 1)
+            while (rect_in_intersect(ball->get_bounds(), this->get_bounds()))
             {
-                ball->set_x(r.x + r.w + ball->get_r() + 10);
-            }
-            if (collision == 3)
-            {
-                ball->set_x(r.x - ball->get_r() - 10);
-            }
-            if (collision == 0)
-            {
-                ball->set_y(r.y - ball->get_r() - 10);
-            }
-            // if (collision == 2)
-            // {
-            //     ball->set_y(r.y + ball->get_r());
-            // }
-            ball->set_vy(dy - ball->get_vy());
-            // if (type == CHARACTER_RIGHT)
-            //     ball->set_x(bounds.x - ball->get_r() - 10);
-            // else
-            //     ball->set_x(bounds.x + ball->get_r() + 10);
-            if (name != ball->get_power_owner())
-            {
-                switch (ball->get_power())
+                if (collision == 0)
                 {
-                case KICKFIRE:
-                    bounds.x = bounds.x + (type == CHARACTER_LEFT ? -100 : 100);
-                    mode = CONFUSED;
-                    ball->set_power(NONE, name);
-                    break;
-                case PUNCH:
-                    mode = CONFUSED;
-                    ball->set_power(NONE, name);
-                    break;
-                default:
-                    break;
+                    ball->set_y(ball->get_y() - 20);
+                }
+                else if (collision == 1)
+                {
+                    ball->set_x(ball->get_x() + 20);
+                }
+                else if (collision == 3)
+                {
+                    ball->set_x(ball->get_x() - 20);
+                }
+                else
+                {
+                    ball->set_x(ball->get_x() + 20);
                 }
             }
-            return true;
-        }
-        return false;
-    }
-    bool ball_body_collision()
-    {
-        SDL_Rect rect = this->get_body_rect();
-        int collision = check_for_collision(rect, ball->get_bounds());
-        if (collision >= 0)
-        {
-            ball->set_vx(dx - ball->get_vx() * 0.92);
-            if (collision == 1)
-            {
-                ball->set_x(rect.x + rect.w + ball->get_r());
-            }
-            if (collision == 3)
-            {
-                ball->set_x(rect.x - ball->get_r());
-            }
-            if (collision == 0)
-            {
-                ball->set_y(rect.y - ball->get_r());
-            }
-            if (collision == 2)
-            {
-                ball->set_y(rect.y + ball->get_r());
-            }
-            ball->set_vy(dy - ball->get_vy() * 0.92);
+
+            ball->set_vx(dx - ball->get_vx());
+            ball->set_vy(dy - ball->get_vy());
+
             if (name != ball->get_power_owner())
             {
                 switch (ball->get_power())
@@ -751,28 +681,43 @@ private:
         {
             if (collision == 1)
             {
-                if (type == CHARACTER_LEFT)
+                while (rect_in_intersect(ball->get_bounds(), this->get_bounds()))
+                {
+                    ball->set_x(ball->get_x() + 20);
+                }
                 {
                     ball->set_vx(dx - ball->get_vx() * 0.95);
                     ball->set_vy(dy + 30);
-                    ball->set_x(r.x + r.w + ball->get_r() + 10);
                 }
             }
             if (collision == 3)
             {
-                if (type == CHARACTER_RIGHT)
+                while (rect_in_intersect(ball->get_bounds(), this->get_bounds()))
+                {
+                    ball->set_x(ball->get_x() - 20);
+                }
                 {
                     ball->set_vx(dx - ball->get_vx() * 0.95);
                     ball->set_vy(dy + 30);
-                    ball->set_x(r.x - ball->get_r() - 10);
                 }
             }
             else if (collision == 2)
             {
+                while (rect_in_intersect(ball->get_bounds(), this->get_bounds()))
+                {
+                    ball->set_x(ball->get_x() + (type == CHARACTER_LEFT ? 20 : -20));
+                }
                 ball->set_vx(dx + ball->get_vx() + 15);
                 ball->set_vy(dy - ball->get_vy());
-                ball->set_y(r.y + ball->get_r() + 5);
-                ball->set_x(ball->get_x() + 5);
+            }
+            else if (collision == 0)
+            {
+                while (rect_in_intersect(ball->get_bounds(), this->get_bounds()))
+                {
+                    ball->set_x(ball->get_x() + (type == CHARACTER_LEFT ? 20 : -20));
+                }
+                ball->set_vx(dx - ball->get_vx() * 0.95);
+                ball->set_vy(dy - ball->get_vy());
             }
             if (name != ball->get_power_owner())
             {
@@ -801,7 +746,6 @@ public:
     Character(SDL_Renderer *renderer, SDL_Event *event, SDL_Rect bounds, Char_types type, Ball *ball, Powers power, int head_number = 0, int body_number = 0, int shoes_model = 0, int shoe_number = 0)
     {
         this->head_number = head_number;
-        this->body_number = body_number;
         this->shoes_model = shoes_model;
         this->shoes_current_number = shoe_number;
         this->bounds = bounds;
@@ -814,12 +758,10 @@ public:
         this->power = power;
     }
     Character(Character &character) = delete;
-    void set_keys(int right, int left, int up, int power_key) { keys[0] = right, keys[1] = left, keys[2] = up, keys[3] = power_key; }
     Uint8 get_num_of_goals() { return num_of_goals; }
     void add_goal() { num_of_goals++; }
     Char_modes get_mode() { return mode; }
     Char_types get_type() { return type; }
-    void set_name(string name) { this->name = name; }
     bool ball_collision(SDL_Rect *ball_bounds)
     {
         if (ball_bounds->y > bounds.y)
@@ -831,12 +773,11 @@ public:
             return false;
         }
     }
-    void set_texture(SDL_Texture *new_texture) { back_texture = new_texture; }
     SDL_Texture *get_texture() { return back_texture; }
     void render(SDL_Renderer *renderer)
     {
         SDL_SetRenderTarget(renderer, back_texture);
-        if (mode != CONFUSED)
+        if (mode != CONFUSED && mode != FREEZED)
         {
             set_mode();
         }
@@ -881,13 +822,11 @@ public:
         dy += dvy;
         bounds.y += dy;
         head_rect = this->get_head_rect();
-        body_rect = this->get_body_rect();
         shoes_rects[shoes_current_number] = this->get_feet_rect();
 
         if (mode != CONFUSED)
         {
-            ball_foot_collision();
-            ball_head_colision();
+            bool r = ball_foot_collision() || ball_head_colision();
         }
         else
         {
@@ -912,32 +851,35 @@ public:
         }
         power_percent += 1;
     }
+    
     int get_vx() { return dx; }
     int get_vy() { return dy; }
     SDL_Rect get_head_rect()
     {
         return SDL_Rect{bounds.x + (bounds.w - head_rect.w) / 2, bounds.y, head_rect.w, head_rect.h};
     }
-    SDL_Rect get_body_rect()
-    {
-        return SDL_Rect{bounds.x + (bounds.w - body_rect.w) / 2, bounds.y + head_rect.h, body_rect.w, body_rect.h};
-    }
     SDL_Rect get_feet_rect()
     {
         SDL_Rect r = shoes_rects[shoes_current_number];
         r.x = bounds.x + (bounds.w - shoes_rects[shoes_current_number].w) / 2;
-        r.y = bounds.y + head_rect.h + body_rect.h;
+        r.y = bounds.y + head_rect.h;
         return r;
     }
     string get_name() { return name; }
+    int get_goals() { return num_of_goals; }
+    int get_max_head_model() { return head_models_number; }
+    SDL_Rect get_bounds() { return bounds; }
+    int get_power_precent() { return power_percent; }
+    void set_keys(int right, int left, int up, int power_key) { keys[0] = right, keys[1] = left, keys[2] = up, keys[3] = power_key; }
+    void set_texture(SDL_Texture *new_texture) { back_texture = new_texture; }
     void set_power_precent(int p)
     {
         power_percent = p;
         if (power_percent > 100)
             power_percent = 100;
     }
-    int get_power_precent() { return power_percent; }
     void set_vx(int new_vx) { dx = new_vx; }
+    void set_name(string name) { this->name = name; }
     void set_vy(int new_vy) { dy = new_vy; }
     void set_head_model(int new_model, SDL_Renderer *renderer)
     {
@@ -952,11 +894,12 @@ public:
         head_rect.h *= head_ratio;
         head_rect.w *= head_ratio;
     }
-    int get_goals() { return num_of_goals; }
     void set_goals(int goal) { num_of_goals = goal; }
     void set_x(int x) { bounds.x = x; }
-    int get_max_head_model() { return head_models_number; }
-    SDL_Rect get_bounds() { return bounds; }
+    void set_mode(Char_modes mode)
+    {
+        this->mode = mode;
+    }
     ~Character()
     {
         SDL_DestroyTexture(back_texture);
@@ -1121,6 +1064,7 @@ private:
     void read_keys_and_mouse(SDL_Event *event)
     {
         int x = 0, y = 0;
+
         if (SDL_GetMouseState(&x, &y) & SDL_BUTTON_LMASK)
         {
             if (SDL_PointInRect(new SDL_Point{x, y}, &bounds))
@@ -1307,7 +1251,7 @@ public:
     {
         this->text.text = text;
     }
-    void render(SDL_Renderer *renderer, SDL_Rect *srcrect = NULL)
+    void render(SDL_Renderer *renderer, SDL_Texture *dst = NULL, SDL_Rect *srcrect = NULL)
     {
         int x = 0, y = 0;
         SDL_GetMouseState(&x, &y);
@@ -1324,6 +1268,7 @@ public:
         SDL_SetRenderTarget(renderer, former_texture);
         former_texture = NULL;
     }
+
     SDL_Color get_color()
     {
         return back_color;
@@ -1347,10 +1292,11 @@ public:
 };
 typedef struct Button Button;
 
+SDL_Color back_color{30, 40, 50, 255};
 void clear_window(SDL_Renderer *m_renderer)
 {
     SDL_SetRenderTarget(m_renderer, NULL);
-    SDL_SetRenderDrawColor(m_renderer, 30, 40, 50, 255);
+    SDL_SetRenderDrawColor(m_renderer, back_color.r, back_color.g, back_color.b, 255);
     SDL_RenderClear(m_renderer);
 }
 
@@ -1438,8 +1384,8 @@ int main(int argc, char *argv[])
     SDL_Point ball_center{WIDTH / 2, HEIGHT - BOTTOM_MARGIN};
     Ball ball(&ball_center, 20, 30, 0);
 
-    Character l_char(m_renderer, e, {200, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, static_cast<Powers>(rand() % 3), 1, 0, 3);
-    Character r_char(m_renderer, e, {WIDTH - 200 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, static_cast<Powers>(rand() % 3), 0, 1, 2);
+    Character l_char(m_renderer, e, {200, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, static_cast<Powers>(rand()%4), 1, 0, 3);
+    Character r_char(m_renderer, e, {WIDTH - 200 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, static_cast<Powers>(rand() % 4), 0, 1, 2);
 
     l_char.set_keys(SDLK_d, SDLK_a, SDLK_w, SDLK_s);
     //-----====-Main game loop start-====-----
@@ -1455,13 +1401,17 @@ int main(int argc, char *argv[])
         {
             // Initialization
             // Game_State = STATE_GET_NAMES;
-            Button start(m_renderer, SDL_Color{210, 250, 200, 255}, SDL_Rect{WIDTH / 2 - 125, 250, 250, 100});
-            Button quit(m_renderer, SDL_Color{250, 210, 200, 255}, SDL_Rect{WIDTH / 2 - 125, 500, 250, 100});
+            Button start(m_renderer, SDL_Color{210, 250, 200, 255}, SDL_Rect{WIDTH / 2 - 100, 250, 200, 60});
+            Button setting(m_renderer, SDL_Color{250, 220, 250, 255}, SDL_Rect{WIDTH / 2 - 100, 400, 200, 60});
+            Button quit(m_renderer, SDL_Color{250, 210, 200, 255}, SDL_Rect{WIDTH / 2 - 100, 550, 200, 60});
 
             start.set_text("Start");
+            setting.set_text("Setting");
             quit.set_text("Quit");
-            start.set_text_size(30);
-            quit.set_text_size(30);
+            start.set_text_size(20);
+            quit.set_text_size(20);
+            setting.set_text_size(20);
+
             TTF_Font *welcome_font = TTF_OpenFont(FONT_ADDR, 50);
             // Loop
             while (Game_State == STATE_START_MENU)
@@ -1470,12 +1420,114 @@ int main(int argc, char *argv[])
                 render_text_center(m_renderer, "Welcome!", new SDL_Point{WIDTH / 2, 100}, welcome_font, {200, 200, 200, 255});
 
                 start.render(m_renderer);
+                setting.render(m_renderer);
                 quit.render(m_renderer);
 
                 if (quit.is_clicked())
                     Game_State = STATE_QUIT;
+                if (setting.is_clicked())
+                {
+                    Game_State = STATE_SETTING;
+                }
                 if (start.is_clicked())
                     Game_State = STATE_GET_NAMES;
+
+                window_stuff(m_renderer, e);
+            }
+        }
+        if (Game_State == STATE_SETTING)
+        {
+            Button btn_inc_r(m_renderer, SDL_Color{255, 180, 150, 255}, SDL_Rect{WIDTH / 2 + 100 - 30, 200 - 30, 60, 60});
+            Button btn_dec_r(m_renderer, SDL_Color{255, 180, 150, 255}, SDL_Rect{WIDTH / 2 - 100 - 30, 200 - 30, 60, 60});
+            Button btn_inc_g(m_renderer, SDL_Color{150, 255, 180, 255}, SDL_Rect{WIDTH / 2 + 100 - 30, 320 - 30, 60, 60});
+            Button btn_dec_g(m_renderer, SDL_Color{150, 255, 180, 255}, SDL_Rect{WIDTH / 2 - 100 - 30, 320 - 30, 60, 60});
+            Button btn_inc_b(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 + 100 - 30, 440 - 30, 60, 60});
+            Button btn_dec_b(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 - 100 - 30, 440 - 30, 60, 60});
+
+            Button btn_return(m_renderer, SDL_Color{200, 200, 200, 255}, SDL_Rect{WIDTH / 2 - 100, 550, 200, 60});
+
+            btn_inc_r.set_text(">");
+            btn_dec_r.set_text("<");
+            btn_inc_g.set_text(">");
+            btn_dec_g.set_text("<");
+            btn_inc_b.set_text(">");
+            btn_dec_b.set_text("<");
+
+            btn_return.set_text("return");
+
+            while (Game_State == STATE_SETTING)
+            {
+                clear_window(m_renderer);
+
+                render_text_center(m_renderer, "red", new SDL_Point{WIDTH / 2, 200}, NULL, {250, 150, 150, 255});
+                render_text_center(m_renderer, "green", new SDL_Point{WIDTH / 2, 320}, NULL, {150, 250, 150, 255});
+                render_text_center(m_renderer, "blue", new SDL_Point{WIDTH / 2, 440}, NULL, {150, 150, 250, 255});
+                
+                btn_dec_r.render(m_renderer);
+                btn_inc_r.render(m_renderer);
+                btn_dec_g.render(m_renderer);
+                btn_inc_g.render(m_renderer);
+                btn_dec_b.render(m_renderer);
+                btn_inc_b.render(m_renderer);
+
+                btn_return.render(m_renderer);
+
+                if (btn_dec_r.is_clicked())
+                {
+                    while (btn_dec_r.is_clicked())
+                    {
+                    }
+                    if (back_color.r > 50)
+                        back_color.r -= 5;
+                }
+                if (btn_inc_r.is_clicked())
+                {
+                    while (btn_inc_r.is_clicked())
+                    {
+                    }
+                    if (back_color.r < 120)
+                        back_color.r += 5;
+                }
+
+                if (btn_dec_g.is_clicked())
+                {
+                    while (btn_dec_g.is_clicked())
+                    {
+                    }
+                    if (back_color.g > 50)
+                        back_color.g -= 5;
+                }
+                if (btn_inc_g.is_clicked())
+                {
+                    while (btn_inc_g.is_clicked())
+                    {
+                    }
+                    if (back_color.g < 120)
+                        back_color.g += 5;
+                }
+
+                if (btn_dec_b.is_clicked())
+                {
+                    while (btn_dec_b.is_clicked())
+                    {
+                    }
+                    if (back_color.b > 50)
+                        back_color.b -= 5;
+                }
+                if (btn_inc_b.is_clicked())
+                {
+                    while (btn_inc_b.is_clicked())
+                    {
+                    }
+                    if (back_color.b < 120)
+                        back_color.b += 5;
+                }
+
+                if (btn_return.is_clicked())
+                {
+                    while(btn_return.is_clicked()){}
+                    Game_State = STATE_START_MENU;
+                }
 
                 window_stuff(m_renderer, e);
             }
@@ -1518,7 +1570,6 @@ int main(int argc, char *argv[])
                 window_stuff(m_renderer, e);
             }
         }
-
         if (Game_State == STATE_SELECT_BALL)
         {
             Button next(m_renderer, SDL_Color{100, 200, 250, 255}, SDL_Rect{WIDTH - 400, 400 - 40, 100, 80});
@@ -1682,8 +1733,7 @@ int main(int argc, char *argv[])
             game_timer.pause();
 
             SDL_Surface *surf = IMG_Load("raw/field/goals/l.png");
-            SDL_Texture* goal_l = SDL_CreateTextureFromSurface(m_renderer, surf);
-
+            SDL_Texture *goal_l = SDL_CreateTextureFromSurface(m_renderer, surf);
 
             surf = IMG_Load("raw/field/goals/r.png");
             SDL_Texture *goal_r = SDL_CreateTextureFromSurface(m_renderer, surf);
@@ -1692,12 +1742,68 @@ int main(int argc, char *argv[])
             SDL_Texture *crowd = SDL_CreateTextureFromSurface(m_renderer, surf);
             SDL_FreeSurface(surf);
 
+            SDL_Texture *pause_menu_txtr = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIDTH * 3 / 4, HEIGHT * 4 / 5);
+            SDL_Rect pause_menu_bounds{WIDTH / 8, HEIGHT / 10, WIDTH * 3 / 4, HEIGHT * 4 / 5};
+            bool paused = false;
+            Button btn_resume(m_renderer, SDL_Color{100, 255, 100, 255}, SDL_Rect{WIDTH / 2 - 100, 200, 200, 60});
+            Button btn_main_menu(m_renderer, SDL_Color{220, 220, 220, 255}, SDL_Rect{WIDTH / 2 - 100, 320, 200, 60});
+            Button btn_quit(m_renderer, SDL_Color{255, 100, 100, 255}, SDL_Rect{WIDTH / 2 - 100, 440, 200, 60});
+            btn_resume.set_text("resume");
+            btn_main_menu.set_text("main menu");
+            btn_quit.set_text("quit");
+
+            game_timer.play();
             // loop
             while (Game_State == STATE_GAMING)
             {
                 clear_window(m_renderer);
-                game_timer.play();
-                draw_texture_on_texture(m_renderer, NULL, crowd, {WIDTH / 2, HEIGHT / 2}, HEIGHT - 500);
+                draw_texture_on_texture(m_renderer, NULL, crowd, {WIDTH / 4, HEIGHT / 2}, HEIGHT - 500);
+                draw_texture_on_texture(m_renderer, NULL, crowd, {WIDTH / 4 * 3, HEIGHT / 2}, HEIGHT - 500);
+                if (e->key.keysym.sym == SDLK_ESCAPE)
+                {
+                    paused = true;
+                }
+                if (paused)
+                {
+                    Char_modes r_p;
+                    Char_modes l_p;
+                    if (r_char.get_mode() != Char_modes::FREEZED)
+                        r_p = r_char.get_mode();
+                    if (l_char.get_mode() != Char_modes::FREEZED)
+                        l_p = l_char.get_mode();
+                    game_timer.pause();
+
+                    r_char.set_mode(Char_modes::FREEZED);
+                    l_char.set_mode(Char_modes::FREEZED);
+                    ball.freez();
+
+                    btn_main_menu.render(m_renderer);
+                    btn_quit.render(m_renderer);
+                    btn_resume.render(m_renderer);
+
+                    if (btn_quit.is_clicked())
+                    {
+                        Game_State = STATE_QUIT;
+                    }
+
+                    if (btn_main_menu.is_clicked())
+                    {
+                        r_char.set_mode(r_p);
+                        l_char.set_mode(l_p);
+                        ball.unfreez();
+                        Game_State = STATE_START_MENU;
+                        paused = false;
+                    }
+
+                    if (btn_resume.is_clicked())
+                    {
+                        r_char.set_mode(r_p);
+                        l_char.set_mode(l_p);
+                        ball.unfreez();
+                        game_timer.play();
+                        paused = false;
+                    }
+                }
                 r_char.render(m_renderer);
                 l_char.render(m_renderer);
                 ball.render(m_renderer);
@@ -1710,12 +1816,12 @@ int main(int argc, char *argv[])
                 power_r.set_value(r_char.get_power_precent());
                 power_l.set_value(l_char.get_power_precent());
 
-                if (check_for_collision(l, ball.get_bounds()) == 0)
+                if (check_for_collision(l, ball.get_bounds()) == 0 || check_for_collision(l, ball.get_bounds()) == 3)
                 {
                     ball_center.y = l.y - ball.get_r();
                     ball.set_vy(-ball.get_vy());
                 }
-                if (check_for_collision(r, ball.get_bounds()) == 0)
+                if (check_for_collision(r, ball.get_bounds()) == 0 || check_for_collision(r, ball.get_bounds()) == 1)
                 {
                     ball_center.y = r.y - ball.get_r();
                     ball.set_vy(-ball.get_vy());
@@ -1789,20 +1895,22 @@ int main(int argc, char *argv[])
                 replay_btn.render(m_renderer);
                 main_btn.render(m_renderer);
                 quit_btn.render(m_renderer);
-                //Bug---->>>>
+
                 if (main_btn.is_clicked())
                 {
+                    while(main_btn.is_clicked());
                     Game_State = STATE_START_MENU;
                 }
                 if (replay_btn.is_clicked())
                 {
+                    while(replay_btn.is_clicked());
                     l_char.set_goals(0);
                     r_char.set_goals(0);
                     Game_State = STATE_GAMING;
                 }
-
                 if (quit_btn.is_clicked())
                 {
+                    while(quit_btn.is_clicked());
                     Game_State = STATE_QUIT;
                 }
 
