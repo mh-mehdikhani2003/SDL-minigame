@@ -102,6 +102,20 @@ SDL_Rect draw_texture_on_texture_center(SDL_Renderer *renderer, SDL_Texture *dst
     SDL_RenderCopy(renderer, src, NULL, &dst_rect);
     return dst_rect;
 }
+SDL_Rect draw_texture_on_texture_bottom(SDL_Renderer *renderer, SDL_Texture *dst, SDL_Texture *src, SDL_Point bottom_center_point, Uint16 height)
+{
+    SDL_Rect dst_rect{0, 0, 1, 1};
+    SDL_QueryTexture(src, NULL, NULL, &dst_rect.w, &dst_rect.h);
+
+    dst_rect.w = ((float)height / (float)dst_rect.h) * dst_rect.w;
+    dst_rect.h = height;
+    dst_rect.x = bottom_center_point.x - dst_rect.w / 2;
+    dst_rect.y = bottom_center_point.y - dst_rect.h;
+
+    SDL_SetRenderTarget(renderer, dst);
+    SDL_RenderCopy(renderer, src, NULL, &dst_rect);
+    return dst_rect;
+}
 SDL_Rect draw_texture_on_texture_left(SDL_Renderer *renderer, SDL_Texture *dst, SDL_Texture *src, SDL_Point left_center_point, Uint16 height)
 {
     SDL_Rect dst_rect{0, 0, 1, 1};
@@ -286,7 +300,7 @@ private:
     const int MAX_VELOCITY = 55;
 
     int current_number_cntr = 0;
-    const Uint8 pictures_cnt = 2;
+    const Uint8 pictures_cnt = 3;
     const Uint8 models_number = 2;
 
     Uint8 current_number = 0;
@@ -423,7 +437,10 @@ public:
     }
 
     int get_max_model() { return models_number; }
-
+    void set_r(int new_r)
+    {
+        initial_r = new_r;
+    }
     Sint16 get_x() { return pcenter->x; }
     Sint16 get_y() { return pcenter->y; }
 
@@ -617,7 +634,12 @@ private:
             if (key == power_k)
             {
                 SDL_Rect &r = shoes_rects[shoes_current_number];
-                if (power_percent >= 100 && SDL_PointInRect(new SDL_Point{ball->get_x(), ball->get_y()}, new SDL_Rect{r.x - 50, r.y - 50, r.w + 100, r.h + 100}))
+                SDL_Rect char_bounds = this->get_bounds();
+                char_bounds.x -= 50;
+                char_bounds.y -= 50;
+                char_bounds.h += 100;
+                char_bounds.w += 100;
+                if (power_percent >= 100 && rect_in_intersect(char_bounds, ball->get_bounds()))
                 {
                     ball->set_power((power == THIEF ? static_cast<Powers>(rand() % 3) : power), name);
                     power_percent = 0;
@@ -782,17 +804,7 @@ public:
     void add_goal() { num_of_goals++; }
     Char_modes get_mode() { return mode; }
     Char_types get_type() { return type; }
-    bool ball_collision(SDL_Rect *ball_bounds)
-    {
-        if (ball_bounds->y > bounds.y)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
+
     SDL_Texture *get_texture() { return back_texture; }
     void render(SDL_Renderer *renderer)
     {
@@ -846,7 +858,8 @@ public:
 
         if (mode != CONFUSED)
         {
-            bool r = ball_foot_collision() || ball_head_colision();
+            ball_foot_collision();
+            ball_head_colision();
         }
         else
         {
@@ -899,6 +912,7 @@ public:
         if (power_percent > 100)
             power_percent = 100;
     }
+    void set_power(Powers new_power) { power = new_power; }
     void set_vx(int new_vx) { dx = new_vx; }
     void set_name(string name) { this->name = name; }
     void set_vy(int new_vy) { dy = new_vy; }
@@ -1458,12 +1472,15 @@ int main(int argc, char *argv[])
         }
         if (Game_State == STATE_SETTING)
         {
-            Button btn_inc_r(m_renderer, SDL_Color{255, 180, 150, 255}, SDL_Rect{WIDTH / 2 + 100 - 30, 200 - 30, 60, 60});
-            Button btn_dec_r(m_renderer, SDL_Color{255, 180, 150, 255}, SDL_Rect{WIDTH / 2 - 100 - 30, 200 - 30, 60, 60});
-            Button btn_inc_g(m_renderer, SDL_Color{150, 255, 180, 255}, SDL_Rect{WIDTH / 2 + 100 - 30, 320 - 30, 60, 60});
-            Button btn_dec_g(m_renderer, SDL_Color{150, 255, 180, 255}, SDL_Rect{WIDTH / 2 - 100 - 30, 320 - 30, 60, 60});
-            Button btn_inc_b(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 + 100 - 30, 440 - 30, 60, 60});
-            Button btn_dec_b(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 - 100 - 30, 440 - 30, 60, 60});
+            Button btn_inc_r(m_renderer, SDL_Color{255, 180, 150, 255}, SDL_Rect{WIDTH / 2 + 100 - 30 - 200, 200 - 30, 60, 60});
+            Button btn_dec_r(m_renderer, SDL_Color{255, 180, 150, 255}, SDL_Rect{WIDTH / 2 - 100 - 30 - 200, 200 - 30, 60, 60});
+            Button btn_inc_g(m_renderer, SDL_Color{150, 255, 180, 255}, SDL_Rect{WIDTH / 2 + 100 - 30 - 200, 320 - 30, 60, 60});
+            Button btn_dec_g(m_renderer, SDL_Color{150, 255, 180, 255}, SDL_Rect{WIDTH / 2 - 100 - 30 - 200, 320 - 30, 60, 60});
+            Button btn_inc_b(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 + 100 - 30 - 200, 440 - 30, 60, 60});
+            Button btn_dec_b(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 - 100 - 30 - 200, 440 - 30, 60, 60});
+
+            Button btn_inc_rad(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 - 100 - 30 + 200 + 300, 320 - 30, 60, 60});
+            Button btn_dec_rad(m_renderer, SDL_Color{180, 150, 255, 255}, SDL_Rect{WIDTH / 2 - 100 - 30 + 200, 320 - 30, 60, 60});
 
             Button btn_return(m_renderer, SDL_Color{200, 200, 200, 255}, SDL_Rect{WIDTH / 2 - 100, 550, 200, 60});
 
@@ -1473,6 +1490,13 @@ int main(int argc, char *argv[])
             btn_dec_g.set_text("<");
             btn_inc_b.set_text(">");
             btn_dec_b.set_text("<");
+            btn_inc_rad.set_text(">");
+            btn_dec_rad.set_text("<");
+
+            ball.set_ay(0);
+            ball.set_vx(0);
+            ball.set_vy(0);
+            ball.set_center({WIDTH / 2 + 250, 320});
 
             btn_return.set_text("return");
 
@@ -1480,9 +1504,9 @@ int main(int argc, char *argv[])
             {
                 clear_window(m_renderer);
 
-                render_text_center(m_renderer, "red", new SDL_Point{WIDTH / 2, 200}, NULL, {250, 150, 150, 255});
-                render_text_center(m_renderer, "green", new SDL_Point{WIDTH / 2, 320}, NULL, {150, 250, 150, 255});
-                render_text_center(m_renderer, "blue", new SDL_Point{WIDTH / 2, 440}, NULL, {150, 150, 250, 255});
+                render_text_center(m_renderer, "red", new SDL_Point{WIDTH / 2 - 200, 200}, NULL, {250, 150, 150, 255});
+                render_text_center(m_renderer, "green", new SDL_Point{WIDTH / 2 - 200, 320}, NULL, {150, 250, 150, 255});
+                render_text_center(m_renderer, "blue", new SDL_Point{WIDTH / 2 - 200, 440}, NULL, {150, 150, 250, 255});
 
                 btn_dec_r.render(m_renderer);
                 btn_inc_r.render(m_renderer);
@@ -1491,7 +1515,28 @@ int main(int argc, char *argv[])
                 btn_dec_b.render(m_renderer);
                 btn_inc_b.render(m_renderer);
 
+                btn_inc_rad.render(m_renderer);
+                btn_dec_rad.render(m_renderer);
+
+                ball.render(m_renderer);
+
                 btn_return.render(m_renderer);
+
+                if (btn_dec_rad.is_clicked())
+                {
+                    while (btn_dec_rad.is_clicked())
+                        ;
+                    if (ball.get_r() > 10)
+                        ball.set_r(ball.get_r() - 5);
+                }
+
+                if (btn_inc_rad.is_clicked())
+                {
+                    while (btn_inc_rad.is_clicked())
+                        ;
+                    if (ball.get_r() < 60)
+                        ball.set_r(ball.get_r() + 5);
+                }
 
                 if (btn_dec_r.is_clicked())
                 {
@@ -1755,6 +1800,9 @@ int main(int argc, char *argv[])
             Timer game_timer;
             game_timer.pause();
 
+            l_char.set_power(static_cast<Powers>(rand() % 4));
+            r_char.set_power(static_cast<Powers>(rand() % 4));
+
             SDL_Surface *surf = IMG_Load("raw/field/goals/l.png");
             SDL_Texture *goal_l = SDL_CreateTextureFromSurface(m_renderer, surf);
 
@@ -1768,7 +1816,7 @@ int main(int argc, char *argv[])
             SDL_Texture *power_icon = SDL_CreateTextureFromSurface(m_renderer, surf);
 
             surf = IMG_Load("raw/field/back.png");
-            SDL_Texture* background  = SDL_CreateTextureFromSurface(m_renderer , surf);
+            SDL_Texture *background = SDL_CreateTextureFromSurface(m_renderer, surf);
             SDL_FreeSurface(surf);
 
             SDL_Texture *pause_menu_txtr = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIDTH * 3 / 4, HEIGHT * 4 / 5);
@@ -1782,15 +1830,38 @@ int main(int argc, char *argv[])
             btn_quit.set_text("quit");
 
             string powers_str[] = {"Kick Fire", "Punch", "Ball Eater", "Thief"};
+            ball.set_ay(GRAVITY);
+            ball.set_center({WIDTH / 2, HEIGHT / 2});
 
             game_timer.play();
+
+            int left_crowd_height = HEIGHT / 2;
+            int right_crowd_height = HEIGHT / 2;
+            int right_goal_counter = 0;
+            int left_goal_counter = 0;
             // loop
             while (Game_State == STATE_GAMING)
             {
                 clear_window(m_renderer);
-                draw_texture_on_texture_center(m_renderer , NULL , background , {WIDTH/2 , HEIGHT/2} , HEIGHT);
-                draw_texture_on_texture_center(m_renderer, NULL, crowd, {WIDTH / 4, HEIGHT / 2}, HEIGHT - 500);
-                draw_texture_on_texture_center(m_renderer, NULL, crowd, {WIDTH / 4 * 3, HEIGHT / 2}, HEIGHT - 500);
+                left_crowd_height = HEIGHT / 2 - (left_goal_counter == 0 ? 0 : 100);
+                right_crowd_height = HEIGHT / 2 - (right_goal_counter == 0 ? 0 : 100);
+
+                if (right_goal_counter > 0)
+                {
+                    right_goal_counter++;
+                    if (right_goal_counter > 20)
+                        right_goal_counter = 0;
+                }
+                if (left_goal_counter > 0)
+                {
+                    left_goal_counter++;
+                    if (left_goal_counter > 20)
+                        left_goal_counter = 0;
+                }
+                
+                draw_texture_on_texture_center(m_renderer, NULL, crowd, {WIDTH / 4, left_crowd_height}, HEIGHT - 500);
+                draw_texture_on_texture_center(m_renderer, NULL, crowd, {WIDTH / 4 * 3, right_crowd_height}, HEIGHT - 500);
+                draw_texture_on_texture_bottom(m_renderer, NULL, background, {WIDTH / 2, HEIGHT - BOTTOM_MARGIN}, 300);
 
                 if (e->key.keysym.sym == SDLK_ESCAPE)
                 {
@@ -1838,18 +1909,20 @@ int main(int argc, char *argv[])
                     }
                 }
 
+                //render powers
                 SDL_Rect p_l = draw_texture_on_texture_left(m_renderer, NULL, power_icon, {110, 100}, 30);
                 SDL_Rect p_r = draw_texture_on_texture_left(m_renderer, NULL, power_icon, {WIDTH - 190, 100}, 30);
                 render_text_left(m_renderer, powers_str[l_char.get_power()].c_str(), new SDL_Point{p_l.x + p_l.w, p_l.y + p_l.h / 2}, NULL, {255, 255, 220, 255});
                 render_text_left(m_renderer, powers_str[r_char.get_power()].c_str(), new SDL_Point{p_r.x + p_r.w, p_r.y + p_r.h / 2}, NULL, {255, 255, 220, 255});
 
+                //render characters and power bars
                 r_char.render(m_renderer);
                 l_char.render(m_renderer);
                 ball.render(m_renderer);
                 power_l.render(m_renderer);
                 power_r.render(m_renderer);
-                SDL_Rect l = draw_texture_on_texture_center(m_renderer, NULL, goal_l, SDL_Point{75, 750 - BOTTOM_MARGIN - 20}, 160);
-                SDL_Rect r = draw_texture_on_texture_center(m_renderer, NULL, goal_r, SDL_Point{WIDTH - 75, 750 - BOTTOM_MARGIN - 20}, 160);
+                SDL_Rect l = draw_texture_on_texture_center(m_renderer, NULL, goal_l, SDL_Point{75, HEIGHT - BOTTOM_MARGIN - 80}, 160);
+                SDL_Rect r = draw_texture_on_texture_center(m_renderer, NULL, goal_r, SDL_Point{WIDTH - 75, HEIGHT - BOTTOM_MARGIN - 80}, 160);
 
                 power_r.set_value(r_char.get_power_precent());
                 power_l.set_value(l_char.get_power_precent());
@@ -1862,9 +1935,15 @@ int main(int argc, char *argv[])
 
                 score_board += ":";
                 score_board += to_string(r_char.get_num_of_goals());
+                Uint8 c =200;
+                if(game_timer.get_time() > 79){
+                    c = (Uint8)(100);
+                }
 
-                render_text_center(m_renderer, gtime.c_str(), new SDL_Point{WIDTH / 2, HEIGHT - 50}, time_font, {240, 220, 220, 255});
-                render_text_center(m_renderer, score_board.c_str(), new SDL_Point{WIDTH / 2, 50}, scores_font, {240, 220, 220, 255});
+                render_text_center(m_renderer, gtime.c_str(), new SDL_Point{WIDTH / 2, HEIGHT - 50}, time_font, {240, c, c, 255});
+                render_text_center(m_renderer, score_board.c_str(), new SDL_Point{WIDTH / 2, 50}, scores_font, {100, 100, 250, 255});
+
+                // check for goals collisions
                 if (check_for_collision(l, ball.get_bounds()) == 0 || check_for_collision(l, ball.get_bounds()) == 3)
                 {
                     ball_center.y = l.y - ball.get_r();
@@ -1882,18 +1961,19 @@ int main(int argc, char *argv[])
                     if (ball_center.x > WIDTH - 200)
                     {
                         l_char.add_goal();
+                        left_goal_counter = 1;
                         r_char.set_power_precent(r_char.get_power_precent() + 20);
                     }
                     else
                     {
                         r_char.add_goal();
+                        right_goal_counter = 1;
                         l_char.set_power_precent(l_char.get_power_precent() + 20);
                     }
 
-                    ball_center.x = WIDTH / 2;
+                    ball.set_center({WIDTH / 2, HEIGHT / 2});
                     ball.set_vy(0);
                     ball.set_vx(0);
-                    ball_center.y = HEIGHT - BOTTOM_MARGIN;
                 }
 
                 // Check for end
@@ -1920,16 +2000,20 @@ int main(int argc, char *argv[])
         }
         if (Game_State == STATE_END_MENU)
         {
-            Button replay_btn(m_renderer, SDL_Color{200, 230, 250, 255}, SDL_Rect{WIDTH / 2 - 100, 200, 200, 60});
-            Button main_btn(m_renderer, SDL_Color{200, 230, 250, 255}, SDL_Rect{WIDTH / 2 - 100, 400, 200, 60});
-            Button quit_btn(m_renderer, SDL_Color{200, 230, 250, 255}, SDL_Rect{WIDTH / 2 - 100, 600, 200, 60});
-            replay_btn.set_text("play again");
-            main_btn.set_text("main menu");
-            quit_btn.set_text("quit");
+            Button replay_btn(m_renderer, SDL_Color{210, 250, 200, 255}, SDL_Rect{WIDTH / 2 - 100, 250, 200, 60});
+            Button main_btn(m_renderer, SDL_Color{250, 220, 250, 255}, SDL_Rect{WIDTH / 2 - 100, 400, 200, 60});
+            Button quit_btn(m_renderer, SDL_Color{250, 210, 200, 255}, SDL_Rect{WIDTH / 2 - 100, 550, 200, 60});
+            replay_btn.set_text("Play again");
+            main_btn.set_text("Main menu");
+            quit_btn.set_text("Quit");
+            TTF_Font *welcome_font = TTF_OpenFont(FONT_ADDR, 50);
 
             while (Game_State == STATE_END_MENU)
             {
                 clear_window(m_renderer);
+
+                render_text_center(m_renderer, "End", new SDL_Point{WIDTH / 2, 100}, welcome_font, {200, 200, 200, 255});
+
                 replay_btn.render(m_renderer);
                 main_btn.render(m_renderer);
                 quit_btn.render(m_renderer);
