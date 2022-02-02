@@ -7,11 +7,11 @@ in debian based distrobutions this command will do that:
 `sudo apt install libsdl2*`
 
 ## Making
-There is a shell file named make.sh in the project root directoy which help you with making the game.
-Just try these commnads on the project root directory:  
+There is a shell file named make.sh in the project root directory which help you with making the game.
+Just try these commands on the project root directory:  
 `sudo chmod +x make.sh`  
 `./make.sh`  
-the above commands make "Program.out" which is the GAME itslef!
+the above commands make "Program.out" which is the GAME itself!
 
 ## Playing!
 Run the game with the following command:  
