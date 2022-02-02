@@ -3,7 +3,7 @@ head football. The university final project:)
 
 ## Installation
 at first you should install SDL2, SDL2_gfx, SDL2_image, SDL2_ttf.
-in debian based distrobutions this command will do that:  
+in debian based distributions this command will do that:  
 `sudo apt install libsdl2*`
 
 ## Making
