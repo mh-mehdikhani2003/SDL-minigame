@@ -26,7 +26,7 @@
 #endif
 
 #ifndef __GFX__
-#include <SDL2/SDL_gfx>
+#include <SDL2/SDL_gfx.h>
 #endif
 
 #define DATA_FILE_ADDR "./data/games/"
@@ -79,13 +79,6 @@ SDL_Rect draw_image_on_point(SDL_Renderer *renderer, SDL_Point center_point, Uin
     {
         return rect;
     }
-}
-
-void load_image_on_texture(SDL_Renderer *renderer, const char *address, SDL_Texture *dst)
-{
-    SDL_Surface *surf = IMG_Load(address);
-    dst = SDL_CreateTextureFromSurface(renderer, surf);
-    SDL_FreeSurface(surf);
 }
 
 SDL_Rect draw_texture_on_texture_center(SDL_Renderer *renderer, SDL_Texture *dst, SDL_Texture *src, SDL_Point center_point, Uint16 height)
@@ -242,22 +235,7 @@ int check_for_collision(SDL_Rect first, SDL_Rect second)
     }
     return -1;
 }
-int check_for_collision_goal(SDL_Rect first, SDL_Rect second)
-{
-    if (rect_in_intersect(first, second) == SDL_TRUE)
-    {
 
-        if (first.y - second.y > 0 && first.y - second.y < second.h)
-            return 0;
-        if (second.y - first.y > 0 && second.y - first.y < first.h)
-            return 2;
-        if (second.x - first.x > 0 && second.x - first.x < first.w)
-            return 1;
-        if (first.x - second.x > 0 && first.x - second.x < second.w)
-            return 3;
-    }
-    return -1;
-}
 
 typedef enum States
 {
@@ -268,10 +246,10 @@ typedef enum States
     STATE_SELECT_CHAR,
     STATE_PAUSE_MENU,
     STATE_END_MENU,
-
     STATE_GAMING,
     STATE_QUIT
 } States;
+
 States Game_State = STATE_START_MENU;
 
 typedef enum Powers
@@ -283,6 +261,25 @@ typedef enum Powers
     NONE
 } Powers;
 Powers Power;
+
+
+typedef enum Char_modes
+{
+    NORMAL,
+    CONFUSED,
+    FREEZED,
+    TRIPLE,
+    RUNNING_LEFT,
+    RUNNING_RIGHT,
+    JUMPING
+} Char_modes;
+
+typedef enum Char_types
+{
+    CHARACTER_RIGHT,
+    CHARACTER_LEFT
+} Char_types;
+
 
 typedef struct Ball
 {
@@ -450,23 +447,6 @@ public:
         return (SDL_Rect{pcenter->x - r, pcenter->y - r, 2 * r, 2 * r});
     }
 } Ball;
-
-typedef enum Char_modes
-{
-    NORMAL,
-    CONFUSED,
-    FREEZED,
-    TRIPLE,
-    RUNNING_LEFT,
-    RUNNING_RIGHT,
-    JUMPING
-} Char_modes;
-
-typedef enum Char_types
-{
-    CHARACTER_RIGHT,
-    CHARACTER_LEFT
-} Char_types;
 
 typedef struct Character
 {
@@ -1047,18 +1027,15 @@ public:
     {
         alarm = time_in_seconds;
     }
-
     bool get_status()
     {
         return is_on;
     }
-
     void clear()
     {
         total_time = 0;
         start_time = time(nullptr);
     }
-
     bool check_alarm()
     {
         return get_time() > alarm;
@@ -1327,6 +1304,8 @@ public:
 };
 typedef struct Button Button;
 
+
+
 SDL_Color back_color{30, 40, 50, 255};
 void clear_window(SDL_Renderer *m_renderer)
 {
@@ -1356,25 +1335,25 @@ void window_stuff(SDL_Renderer *m_renderer, SDL_Event *e)
 //     }
 // }
 
-bool write_game_to_file(string data)
-{
-    ofstream out(DATA_FILE_ADDR);
-    if (!out.is_open())
-    {
-        system("mkdir data");
-        system("mkdir data/games");
-        system("touch ./data/games/data");
-        out.open(DATA_FILE_ADDR);
-        if (!out.is_open())
-        {
-            return false;
-        }
-    }
-    // data += "\n";
-    out << data;
-    out.close();
-    return true;
-}
+// bool write_game_to_file(string data)
+// {
+//     ofstream out(DATA_FILE_ADDR);
+//     if (!out.is_open())
+//     {
+//         system("mkdir data");
+//         system("mkdir data/games");
+//         system("touch ./data/games/data");
+//         out.open(DATA_FILE_ADDR);
+//         if (!out.is_open())
+//         {
+//             return false;
+//         }
+//     }
+//     // data += "\n";
+//     out << data;
+//     out.close();
+//     return true;
+// }
 
 int main(int argc, char *argv[])
 {
@@ -2047,6 +2026,7 @@ int main(int argc, char *argv[])
             Timer time;
             time.set_alarm(2);
             TTF_Font *font = TTF_OpenFont(FONT_ADDR, 70);
+            
             while (Game_State == STATE_QUIT)
             {
                 clear_window(m_renderer);
