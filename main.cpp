@@ -1326,34 +1326,6 @@ void window_stuff(SDL_Renderer *m_renderer, SDL_Event *e)
     SDL_Delay(DELAY);
 }
 
-// bool read_games_from_file(vector<Game> &character)
-// {
-//     std::ifstream file(DATA_FILE_ADDR);
-//     if (!file.is_open())
-//     {
-//         return false;
-//     }
-// }
-
-// bool write_game_to_file(string data)
-// {
-//     ofstream out(DATA_FILE_ADDR);
-//     if (!out.is_open())
-//     {
-//         system("mkdir data");
-//         system("mkdir data/games");
-//         system("touch ./data/games/data");
-//         out.open(DATA_FILE_ADDR);
-//         if (!out.is_open())
-//         {
-//             return false;
-//         }
-//     }
-//     // data += "\n";
-//     out << data;
-//     out.close();
-//     return true;
-// }
 
 int main(int argc, char *argv[])
 {
@@ -1522,7 +1494,7 @@ int main(int argc, char *argv[])
                     while (btn_dec_r.is_clicked())
                     {
                     }
-                    if (back_color.r > 50)
+                    if (back_color.r > 20)
                         back_color.r -= 5;
                 }
                 if (btn_inc_r.is_clicked())
@@ -1539,7 +1511,7 @@ int main(int argc, char *argv[])
                     while (btn_dec_g.is_clicked())
                     {
                     }
-                    if (back_color.g > 50)
+                    if (back_color.g > 20)
                         back_color.g -= 5;
                 }
                 if (btn_inc_g.is_clicked())
@@ -1556,7 +1528,7 @@ int main(int argc, char *argv[])
                     while (btn_dec_b.is_clicked())
                     {
                     }
-                    if (back_color.b > 50)
+                    if (back_color.b > 20)
                         back_color.b -= 5;
                 }
                 if (btn_inc_b.is_clicked())
@@ -1697,6 +1669,9 @@ int main(int argc, char *argv[])
             int l_head_model = 1;
             int r_head_model = 0;
 
+            l_char.set_mode(Char_modes::FREEZED);
+            r_char.set_mode(Char_modes::FREEZED);
+
             next_level.set_text("Play!");
             while (Game_State == STATE_SELECT_CHAR)
             {
@@ -1781,6 +1756,9 @@ int main(int argc, char *argv[])
 
             l_char.set_power(static_cast<Powers>(rand() % 4));
             r_char.set_power(static_cast<Powers>(rand() % 4));
+
+            l_char.set_mode(Char_modes::NORMAL);
+            r_char.set_mode(Char_modes::NORMAL);
 
             SDL_Surface *surf = IMG_Load("raw/field/goals/l.png");
             SDL_Texture *goal_l = SDL_CreateTextureFromSurface(m_renderer, surf);
