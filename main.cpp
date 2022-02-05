@@ -1,15 +1,13 @@
 #include <iostream>
-#include <SDL2/SDL_main.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_mixer.h>
-#include <SDL2/SDL_ttf.h>
-
 #include <string>
 #include <fstream>
 #include <vector>
 #include <ctime>
 #include <cctype>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
+#include <SDL2/SDL_ttf.h>
 
 #ifdef __unix__
 #ifndef __GFX__
@@ -236,6 +234,17 @@ int check_for_collision(SDL_Rect first, SDL_Rect second)
     return -1;
 }
 
+void play_long_sounds(string addr)
+{
+    Mix_Music *GAMESOUND = Mix_LoadMUS(addr.c_str());
+    Mix_PlayMusic(GAMESOUND, 1);
+}
+void play_short_sounds(string addr)
+{
+    string sound = addr;
+    Mix_Chunk *GAMESOUND = Mix_LoadWAV(sound.c_str());
+    Mix_PlayChannel(-1, GAMESOUND, 0);
+}
 
 typedef enum States
 {
@@ -262,7 +271,6 @@ typedef enum Powers
 } Powers;
 Powers Power;
 
-
 typedef enum Char_modes
 {
     NORMAL,
@@ -280,7 +288,6 @@ typedef enum Char_types
     CHARACTER_LEFT
 } Char_types;
 
-
 typedef struct Ball
 {
 private:
@@ -297,11 +304,11 @@ private:
     const int MAX_VELOCITY = 55;
 
     int current_number_cntr = 0;
-    const Uint8 pictures_cnt = 3;
-    const Uint8 models_number = 2;
+    const int pictures_cnt = 3;
+    const int models_number = 2;
 
-    Uint8 current_number = 0;
-    Uint8 current_model = 0;
+    int current_number = 0;
+    int current_model = 0;
     const char *ball_root = "./raw/Balls/";
 
     SDL_Point *pcenter = new SDL_Point{0, 0};
@@ -312,7 +319,10 @@ private:
         string result = "";
         result += string(ball_root);
         result += to_string(current_model);
-        result += (current_number > 0 ? string("(") + to_string(current_number) + string(")") : "");
+        if (current_number > 0)
+        {
+            result += (string("(") + to_string(current_number) + string(")"));
+        }
         result += string(".png");
         return result;
     }
@@ -323,7 +333,7 @@ public:
         this->vx = vx;
         this->pcenter = pcenter;
         this->r = r;
-        //this->color = color;
+        // this->color = color;
         this->current_model = model;
         initial_r = r;
     }
@@ -798,7 +808,7 @@ public:
             dx = 0;
             dy = 0;
         }
-        //render_body(renderer);
+        // render_body(renderer);
         render_foot(renderer);
         render_head(renderer);
         if (mode == RUNNING_LEFT || mode == RUNNING_RIGHT)
@@ -1168,6 +1178,8 @@ private:
     SDL_Texture *back_texture = NULL;
     SDL_Color back_color{0, 0, 0, 0};
 
+    const char *click_mus = "raw/sounds/click.wav";
+
     void init_text()
     {
         text.text = " ";
@@ -1257,7 +1269,7 @@ public:
         int x = 0, y = 0;
         state = SDL_GetMouseState(&x, &y);
         SDL_PumpEvents();
-        return (SDL_PointInRect(new SDL_Point{x, y}, &bounds) && (state & SDL_BUTTON_LMASK));
+        return ((SDL_PointInRect(new SDL_Point{x, y}, &bounds) && (state & SDL_BUTTON_LMASK)));
     }
     void set_text(string text)
     {
@@ -1280,7 +1292,7 @@ public:
         SDL_SetRenderTarget(renderer, former_texture);
         former_texture = NULL;
     }
-
+    void play_click() { play_short_sounds(click_mus); }
     SDL_Color get_color()
     {
         return back_color;
@@ -1304,8 +1316,6 @@ public:
 };
 typedef struct Button Button;
 
-
-
 SDL_Color back_color{30, 40, 50, 255};
 void clear_window(SDL_Renderer *m_renderer)
 {
@@ -1326,17 +1336,16 @@ void window_stuff(SDL_Renderer *m_renderer, SDL_Event *e)
     SDL_Delay(DELAY);
 }
 
-
 int main(int argc, char *argv[])
 {
     SDL_Window *m_window = NULL;
     SDL_Renderer *m_renderer = NULL;
     // Initialization of SDL window
     {
-        Uint32 SDL_flags = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
+        Uint32 SDL_flags = SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO;
         Uint32 WND_flags = SDL_WINDOW_HIDDEN;
-
-        if (SDL_Init(SDL_flags) < 0 || TTF_Init() < 0 || IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG) == 0)
+        int result = Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
+        if (SDL_Init(SDL_flags) < 0 || TTF_Init() < 0 || IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG) == 0 || Mix_Init(MIX_INIT_MP3) == 0 || result != 0)
         {
             printf("Error with SDL_Init: %s", SDL_GetError());
             return -1;
@@ -1373,6 +1382,10 @@ int main(int argc, char *argv[])
     Character l_char(m_renderer, e, {200, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, static_cast<Powers>(rand() % 4), 1, 0, 3);
     Character r_char(m_renderer, e, {WIDTH - 200 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, static_cast<Powers>(rand() % 4), 0, 1, 2);
 
+    // playing_long_sounds("raw/sounds/main-menu.wav");
+    Mix_Music *mus = Mix_LoadMUS("raw/sounds/main-menu.wav");
+    Mix_PlayMusic(mus, 1);
+
     l_char.set_keys(SDLK_d, SDLK_a, SDLK_w, SDLK_s);
     //-----====-Main game loop start-====-----
     while (1)
@@ -1404,20 +1417,34 @@ int main(int argc, char *argv[])
             {
                 clear_window(m_renderer);
                 render_text_center(m_renderer, "Welcome!", new SDL_Point{WIDTH / 2, 100}, welcome_font, {200, 200, 200, 255});
-
-                start.render(m_renderer);
                 setting.render(m_renderer);
+                start.render(m_renderer);
                 quit.render(m_renderer);
 
                 if (quit.is_clicked())
+                {
+                    while (quit.is_clicked())
+                    {
+                    }
+                    quit.play_click();
                     Game_State = STATE_QUIT;
+                }
                 if (setting.is_clicked())
                 {
+                    while (setting.is_clicked())
+                    {
+                    }
+                    setting.play_click();
                     Game_State = STATE_SETTING;
                 }
                 if (start.is_clicked())
+                {
+                    while (start.is_clicked())
+                    {
+                    }
+                    start.play_click();
                     Game_State = STATE_GET_NAMES;
-
+                }
                 window_stuff(m_renderer, e);
             }
         }
@@ -1477,7 +1504,8 @@ int main(int argc, char *argv[])
                 {
                     while (btn_dec_rad.is_clicked())
                         ;
-                    if (ball.get_r() > 10)
+                    btn_dec_rad.play_click();
+                    if (ball.get_r() > 20)
                         ball.set_r(ball.get_r() - 5);
                 }
 
@@ -1485,6 +1513,7 @@ int main(int argc, char *argv[])
                 {
                     while (btn_inc_rad.is_clicked())
                         ;
+                    btn_dec_rad.play_click();
                     if (ball.get_r() < 60)
                         ball.set_r(ball.get_r() + 5);
                 }
@@ -1494,14 +1523,17 @@ int main(int argc, char *argv[])
                     while (btn_dec_r.is_clicked())
                     {
                     }
+                    btn_dec_r.play_click();
                     if (back_color.r > 20)
                         back_color.r -= 5;
                 }
+
                 if (btn_inc_r.is_clicked())
                 {
                     while (btn_inc_r.is_clicked())
                     {
                     }
+                    btn_inc_r.play_click();
                     if (back_color.r < 120)
                         back_color.r += 5;
                 }
@@ -1511,14 +1543,17 @@ int main(int argc, char *argv[])
                     while (btn_dec_g.is_clicked())
                     {
                     }
+                    btn_dec_g.play_click();
                     if (back_color.g > 20)
                         back_color.g -= 5;
                 }
+
                 if (btn_inc_g.is_clicked())
                 {
                     while (btn_inc_g.is_clicked())
                     {
                     }
+                    btn_inc_g.play_click();
                     if (back_color.g < 120)
                         back_color.g += 5;
                 }
@@ -1528,14 +1563,17 @@ int main(int argc, char *argv[])
                     while (btn_dec_b.is_clicked())
                     {
                     }
+                    btn_dec_b.play_click();
                     if (back_color.b > 20)
                         back_color.b -= 5;
                 }
+
                 if (btn_inc_b.is_clicked())
                 {
                     while (btn_inc_b.is_clicked())
                     {
                     }
+                    btn_inc_b.play_click();
                     if (back_color.b < 120)
                         back_color.b += 5;
                 }
@@ -1545,6 +1583,7 @@ int main(int argc, char *argv[])
                     while (btn_return.is_clicked())
                     {
                     }
+                    btn_return.play_click();
                     Game_State = STATE_START_MENU;
                 }
 
@@ -1576,6 +1615,7 @@ int main(int argc, char *argv[])
                         while (btn_next.is_clicked())
                         {
                         }
+                        btn_next.play_click();
                         Game_State = STATE_SELECT_BALL;
                         l_char.set_name(l_ch_tb.get_text());
                         r_char.set_name(r_ch_tb.get_text());
@@ -1602,18 +1642,17 @@ int main(int argc, char *argv[])
             pervious.set_text_size(50);
 
             int current_model = 0;
-
-            Ball preview_ball(new SDL_Point{WIDTH / 2, HEIGHT / 2}, 0, 50, current_model);
-            preview_ball.set_ay(0);
-
+            ball.set_center({WIDTH / 2, HEIGHT / 2});
+            ball.set_ay(0);
+            ball.set_vx(0);
             while (Game_State == STATE_SELECT_BALL)
             {
                 clear_window(m_renderer);
 
                 next.render(m_renderer);
                 pervious.render(m_renderer);
-                preview_ball.set_model(current_model);
-                preview_ball.render(m_renderer);
+                ball.set_model(current_model);
+                ball.render(m_renderer);
                 next_level.render(m_renderer);
 
                 if (next.is_clicked())
@@ -1621,6 +1660,7 @@ int main(int argc, char *argv[])
                     while (next.is_clicked())
                     {
                     }
+                    next.play_click();
                     current_model++;
                     if (current_model >= ball.get_max_model())
                     {
@@ -1632,10 +1672,11 @@ int main(int argc, char *argv[])
                     while (pervious.is_clicked())
                     {
                     }
+                    pervious.play_click();
                     current_model--;
                     if (current_model < 0)
                     {
-                        current_model = preview_ball.get_max_model() - 1;
+                        current_model = ball.get_max_model() - 1;
                     }
                 }
 
@@ -1644,7 +1685,7 @@ int main(int argc, char *argv[])
                     while (next_level.is_clicked())
                     {
                     }
-
+                    next_level.play_click();
                     ball.set_model(current_model);
                     Game_State = STATE_SELECT_CHAR;
                 }
@@ -1689,7 +1730,7 @@ int main(int argc, char *argv[])
                 {
                     while (l_h_i.is_clicked())
                         ;
-
+                    l_h_i.play_click();
                     l_head_model += 2;
                     if (l_head_model >= l_char.get_max_head_model() * 2)
                     {
@@ -1702,7 +1743,7 @@ int main(int argc, char *argv[])
                 {
                     while (l_h_d.is_clicked())
                         ;
-
+                    l_h_d.play_click();
                     l_head_model -= 2;
                     if (l_head_model < 1)
                     {
@@ -1715,7 +1756,7 @@ int main(int argc, char *argv[])
                 {
                     while (r_h_i.is_clicked())
                         ;
-
+                    r_h_i.play_click();
                     r_head_model += 2;
                     if (r_head_model >= r_char.get_max_head_model() * 2)
                     {
@@ -1728,7 +1769,7 @@ int main(int argc, char *argv[])
                 {
                     while (r_h_d.is_clicked())
                         ;
-
+                    r_h_d.play_click();
                     r_head_model -= 2;
                     if (r_head_model <= 0)
                     {
@@ -1739,6 +1780,10 @@ int main(int argc, char *argv[])
 
                 if (next_level.is_clicked())
                 {
+                    while (next_level.is_clicked())
+                    {
+                    }
+                    next_level.play_click();
                     Game_State = STATE_GAMING;
                 }
 
@@ -1815,7 +1860,7 @@ int main(int argc, char *argv[])
                     if (left_goal_counter > 20)
                         left_goal_counter = 0;
                 }
-                
+
                 draw_texture_on_texture_center(m_renderer, NULL, crowd, {WIDTH / 4, left_crowd_height}, HEIGHT - 500);
                 draw_texture_on_texture_center(m_renderer, NULL, crowd, {WIDTH / 4 * 3, right_crowd_height}, HEIGHT - 500);
                 draw_texture_on_texture_bottom(m_renderer, NULL, background, {WIDTH / 2, HEIGHT - BOTTOM_MARGIN}, 300);
@@ -1844,11 +1889,18 @@ int main(int argc, char *argv[])
 
                     if (btn_quit.is_clicked())
                     {
+                        while (btn_quit.is_clicked())
+                        {
+                        }
+                        btn_quit.play_click();
                         Game_State = STATE_QUIT;
                     }
 
                     if (btn_main_menu.is_clicked())
                     {
+                        while (btn_main_menu.is_clicked())
+                            ;
+                        btn_main_menu.play_click();
                         r_char.set_mode(r_p);
                         l_char.set_mode(l_p);
                         ball.unfreez();
@@ -1858,6 +1910,9 @@ int main(int argc, char *argv[])
 
                     if (btn_resume.is_clicked())
                     {
+                        while (btn_resume.is_clicked())
+                            ;
+                        btn_resume.play_click();
                         r_char.set_mode(r_p);
                         l_char.set_mode(l_p);
                         ball.unfreez();
@@ -1866,13 +1921,13 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                //render powers
+                // render powers
                 SDL_Rect p_l = draw_texture_on_texture_left(m_renderer, NULL, power_icon, {110, 100}, 30);
                 SDL_Rect p_r = draw_texture_on_texture_left(m_renderer, NULL, power_icon, {WIDTH - 190, 100}, 30);
                 render_text_left(m_renderer, powers_str[l_char.get_power()].c_str(), new SDL_Point{p_l.x + p_l.w, p_l.y + p_l.h / 2}, NULL, {255, 255, 220, 255});
                 render_text_left(m_renderer, powers_str[r_char.get_power()].c_str(), new SDL_Point{p_r.x + p_r.w, p_r.y + p_r.h / 2}, NULL, {255, 255, 220, 255});
 
-                //render characters and power bars
+                // render characters and power bars
                 r_char.render(m_renderer);
                 l_char.render(m_renderer);
                 ball.render(m_renderer);
@@ -1892,8 +1947,9 @@ int main(int argc, char *argv[])
 
                 score_board += ":";
                 score_board += to_string(r_char.get_num_of_goals());
-                Uint8 c =200;
-                if(game_timer.get_time() > 79){
+                Uint8 c = 200;
+                if (game_timer.get_time() > 79)
+                {
                     c = (Uint8)(100);
                 }
 
@@ -1918,6 +1974,7 @@ int main(int argc, char *argv[])
                     if (ball_center.x > WIDTH - 200)
                     {
                         l_char.add_goal();
+                        play_short_sounds("raw/sounds/goal-reaction.wav");
                         left_goal_counter = 1;
                         r_char.set_power_precent(r_char.get_power_precent() + 20);
                     }
@@ -1925,6 +1982,8 @@ int main(int argc, char *argv[])
                     {
                         r_char.add_goal();
                         right_goal_counter = 1;
+                        play_short_sounds("raw/sounds/goal-reaction.wav");
+
                         l_char.set_power_precent(l_char.get_power_precent() + 20);
                     }
 
@@ -1946,15 +2005,7 @@ int main(int argc, char *argv[])
             SDL_DestroyTexture(crowd);
             SDL_DestroyTexture(power_icon);
         }
-        if (Game_State == STATE_PAUSE_MENU)
-        {
 
-            while (Game_State == STATE_PAUSE_MENU)
-            {
-                clear_window(m_renderer);
-                window_stuff(m_renderer, e);
-            }
-        }
         if (Game_State == STATE_END_MENU)
         {
             Button replay_btn(m_renderer, SDL_Color{210, 250, 200, 255}, SDL_Rect{WIDTH / 2 - 100, 250, 200, 60});
@@ -1979,12 +2030,14 @@ int main(int argc, char *argv[])
                 {
                     while (main_btn.is_clicked())
                         ;
+                    main_btn.play_click();
                     Game_State = STATE_START_MENU;
                 }
                 if (replay_btn.is_clicked())
                 {
                     while (replay_btn.is_clicked())
                         ;
+                    replay_btn.play_click();
                     l_char.set_goals(0);
                     r_char.set_goals(0);
                     Game_State = STATE_GAMING;
@@ -1993,6 +2046,7 @@ int main(int argc, char *argv[])
                 {
                     while (quit_btn.is_clicked())
                         ;
+                    quit_btn.play_click();
                     Game_State = STATE_QUIT;
                 }
 
@@ -2004,7 +2058,7 @@ int main(int argc, char *argv[])
             Timer time;
             time.set_alarm(2);
             TTF_Font *font = TTF_OpenFont(FONT_ADDR, 70);
-            
+
             while (Game_State == STATE_QUIT)
             {
                 clear_window(m_renderer);
@@ -2025,6 +2079,7 @@ int main(int argc, char *argv[])
     // Finalize and free resources
     SDL_DestroyWindow(m_window);
     SDL_DestroyRenderer(m_renderer);
+    Mix_Quit();
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
