@@ -24,8 +24,7 @@
 
 using namespace std;
 
-
-//global variables
+// global variables
 TTF_Font *gfont = NULL;
 SDL_Color back_color{30, 40, 50, 255};
 
@@ -215,6 +214,7 @@ int check_for_collision(SDL_Rect first, SDL_Rect second)
     }
     return -1;
 }
+
 void play_long_sounds(string addr)
 {
     Mix_Music *GAMESOUND = Mix_LoadMUS(addr.c_str());
@@ -269,9 +269,7 @@ typedef enum Char_types
     CHARACTER_LEFT
 } Char_types;
 
-
-
-//Structs definition
+// Structs definition
 typedef struct Ball
 {
 private:
@@ -283,6 +281,7 @@ private:
 
     Powers power = NONE;
     string power_owner = "";
+    
     Uint32 start_invisibility_time = 0;
 
     const int MAX_VELOCITY = 55;
@@ -290,14 +289,15 @@ private:
     int current_number_cntr = 0;
     const int pictures_cnt = 3;
     const int models_number = 2;
+    const char *ball_root = "./raw/Balls/";
 
     int current_number = 0;
     int current_model = 0;
-    const char *ball_root = "./raw/Balls/";
 
     SDL_Point *pcenter = new SDL_Point{0, 0};
     int r = 0;
     int initial_r = 0;
+    
     string create_addres()
     {
         string result = "";
@@ -368,7 +368,6 @@ public:
 } Ball;
 void Ball::render(SDL_Renderer *renderer)
 {
-
     int x = pcenter->x;
     int y = pcenter->y;
     if (!freezed)
@@ -377,9 +376,8 @@ void Ball::render(SDL_Renderer *renderer)
         {
             vx = MAX_VELOCITY;
         }
-        if (vy > MAX_VELOCITY || vy < -MAX_VELOCITY)
-        {
-            // vy = MAX_VELOCITY * (vy > 0 ? 1 : -1);
+        if( vx < -MAX_VELOCITY){
+            vx = -MAX_VELOCITY;
         }
         vy += ay;
         pcenter->x += vx;
@@ -400,7 +398,7 @@ void Ball::render(SDL_Renderer *renderer)
             pcenter->x = WIDTH - r;
         }
         current_number_cntr++;
-        if (current_number_cntr >= pictures_cnt)
+        if (current_number_cntr >= 2)
         {
             current_number++;
             current_number_cntr = 0;
@@ -445,7 +443,6 @@ void Ball::render(SDL_Renderer *renderer)
 
 
 
-
 typedef struct Character
 {
 private:
@@ -461,6 +458,7 @@ private:
 
     int shoes_current_number = 0;
     int shoes_model = 0;
+
     const static int shoes_cnt = 4;
     const static int conf_pics_cnt = 2;
     const int head_models_number = 7;
@@ -478,6 +476,7 @@ private:
 
     const int x_speed = 20;
     const int y_speed = 75;
+
     int dx = 0, dy = 0, dvy = 0;
     int keys[4] = {SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN};
 
@@ -499,15 +498,11 @@ private:
     void destroy_pics_textures();
     void render_head(SDL_Renderer *renderer)
     {
-        SDL_Point dstpoint = {bounds.x + bounds.w / 2, bounds.y + head_rect.h / 2};
         if (head_rect.x != 0 || head_rect.y != 0)
             SDL_RenderCopy(renderer, head_texture, NULL, &head_rect);
     }
     void render_foot(SDL_Renderer *renderer)
     {
-        SDL_Point dstpoint{0, 0};
-        dstpoint.x = bounds.x + bounds.w / 2;
-        dstpoint.y = bounds.y + head_rect.h + shoes_rects[shoes_current_number].h / 2;
         SDL_RenderCopy(renderer, shoes_textures[shoes_current_number], NULL, &shoes_rects[shoes_current_number]);
     }
     string create_shoes_address(int model, int number)
@@ -541,6 +536,7 @@ private:
         result += ".png";
         return result;
     }
+
     void set_mode();
     bool ball_head_colision();
     bool ball_foot_collision();
@@ -560,13 +556,11 @@ public:
         this->type = type;
         this->power = power;
     }
-    Character(Character &character) = delete;
     Uint8 get_num_of_goals() { return num_of_goals; }
     void add_goal() { num_of_goals++; }
     Char_modes get_mode() { return mode; }
     Char_types get_type() { return type; }
 
-    SDL_Texture *get_texture() { return back_texture; }
     void render(SDL_Renderer *renderer);
     int get_vx() { return dx; }
     int get_vy() { return dy; }
@@ -588,7 +582,6 @@ public:
     int get_power_precent() { return power_percent; }
     Powers get_power() { return power; }
     void set_keys(int right, int left, int up, int power_key) { keys[0] = right, keys[1] = left, keys[2] = up, keys[3] = power_key; }
-    void set_texture(SDL_Texture *new_texture) { back_texture = new_texture; }
     void set_power_precent(int p)
     {
         power_percent = p;
@@ -849,6 +842,7 @@ bool Character::ball_foot_collision()
 void Character::render(SDL_Renderer *renderer)
 {
     SDL_SetRenderTarget(renderer, back_texture);
+
     if (mode != CONFUSED && mode != FREEZED)
     {
         set_mode();
@@ -858,9 +852,12 @@ void Character::render(SDL_Renderer *renderer)
         dx = 0;
         dy = 0;
     }
-    // render_body(renderer);
+    head_rect = this->get_head_rect();
+    shoes_rects[shoes_current_number] = this->get_feet_rect();
+
     render_foot(renderer);
     render_head(renderer);
+
     if (mode == RUNNING_LEFT || mode == RUNNING_RIGHT)
     {
         dx = (mode == RUNNING_LEFT ? -x_speed : x_speed);
@@ -890,11 +887,10 @@ void Character::render(SDL_Renderer *renderer)
         dvy = 0;
         mode = NORMAL;
     }
+
     bounds.x += dx;
     dy += dvy;
     bounds.y += dy;
-    head_rect = this->get_head_rect();
-    shoes_rects[shoes_current_number] = this->get_feet_rect();
 
     if (mode != CONFUSED)
     {
@@ -914,6 +910,7 @@ void Character::render(SDL_Renderer *renderer)
         }
         SDL_RenderCopy(renderer, IMG_LoadTexture(renderer, create_conf_pic_addr().c_str()), NULL, new SDL_Rect{bounds.x - 20, bounds.y - 100, head_rect.w + 40, 100});
     }
+    
     if (bounds.x < 0)
     {
         bounds.x = 1;
@@ -924,8 +921,6 @@ void Character::render(SDL_Renderer *renderer)
     }
     power_percent += 1;
 }
-
-
 
 
 
@@ -992,10 +987,6 @@ void ProgressBar::render(SDL_Renderer *renderer)
     SDL_SetRenderTarget(renderer, former);
 }
 
-
-
-
-
 typedef struct Timer
 {
 private:
@@ -1053,9 +1044,6 @@ public:
     }
 } Timer;
 
-
-
-
 typedef struct Text
 {
     std::string text = " ";
@@ -1075,9 +1063,6 @@ typedef struct Text
     }
 
 } Text;
-
-
-
 
 typedef struct TextBox
 {
@@ -1173,9 +1158,6 @@ void TextBox::render(SDL_Renderer *renderer)
     SDL_RenderCopy(renderer, back_texture, NULL, &bounds);
     render_text_center(renderer, ptext->text.c_str(), new SDL_Point{bounds.x + bounds.w / 2, bounds.y + bounds.h / 2});
 }
-
-
-
 
 struct Button
 {
@@ -1324,7 +1306,6 @@ void Button::set_back_color(SDL_Renderer *renderer, SDL_Color color)
 
 // end of structs
 
-
 void clear_window(SDL_Renderer *m_renderer)
 {
     SDL_SetRenderTarget(m_renderer, NULL);
@@ -1342,7 +1323,6 @@ void window_stuff(SDL_Renderer *m_renderer, SDL_Event *e)
     SDL_RenderPresent(m_renderer);
     SDL_Delay(DELAY);
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -1390,8 +1370,7 @@ int main(int argc, char *argv[])
     Character l_char(m_renderer, e, {200, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_LEFT, &ball, static_cast<Powers>(rand() % 4), 1, 0, 3);
     Character r_char(m_renderer, e, {WIDTH - 200 - 100, HEIGHT - BOTTOM_MARGIN - CHAR_HEIGHT, 100, CHAR_HEIGHT}, CHARACTER_RIGHT, &ball, static_cast<Powers>(rand() % 4), 0, 1, 2);
 
-    Mix_Music *mus = Mix_LoadMUS("raw/sounds/main-menu.wav");
-    Mix_PlayMusic(mus, 1);
+    play_long_sounds("raw/sounds/main-menu.wav");
 
     l_char.set_keys(SDLK_d, SDLK_a, SDLK_w, SDLK_s);
     //-----====-Main game loop start-====-----
