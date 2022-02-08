@@ -14,13 +14,17 @@
 #define FONT_ADDR "font.otf"
 
 #define DELAY 40
-#define GRAVITY 10
+#define GRAVITY 13
 
-#define WIDTH 1200
-#define HEIGHT 800
-#define BOTTOM_MARGIN 100
+int WIDTH = 1200;
+int HEIGHT = 800;
+int BOTTOM_MARGIN = 100;
 
-#define CHAR_HEIGHT 150
+int CHAR_HEIGHT = 150;
+
+SDL_Point mouse_coordinates;
+
+Uint32 mouse_state;
 
 using namespace std;
 
@@ -218,7 +222,7 @@ int check_for_collision(SDL_Rect first, SDL_Rect second)
 void play_long_sounds(string addr)
 {
     Mix_Music *GAMESOUND = Mix_LoadMUS(addr.c_str());
-    Mix_PlayMusic(GAMESOUND, 1);
+    Mix_PlayMusic(GAMESOUND, -1);
 }
 void play_short_sounds(string addr)
 {
@@ -281,7 +285,7 @@ private:
 
     Powers power = NONE;
     string power_owner = "";
-    
+
     Uint32 start_invisibility_time = 0;
 
     const int MAX_VELOCITY = 55;
@@ -297,7 +301,7 @@ private:
     SDL_Point *pcenter = new SDL_Point{0, 0};
     int r = 0;
     int initial_r = 0;
-    
+
     string create_addres()
     {
         string result = "";
@@ -376,7 +380,8 @@ void Ball::render(SDL_Renderer *renderer)
         {
             vx = MAX_VELOCITY;
         }
-        if( vx < -MAX_VELOCITY){
+        if (vx < -MAX_VELOCITY)
+        {
             vx = -MAX_VELOCITY;
         }
         vy += ay;
@@ -439,9 +444,6 @@ void Ball::render(SDL_Renderer *renderer)
         }
     }
 }
-
-
-
 
 typedef struct Character
 {
@@ -910,7 +912,7 @@ void Character::render(SDL_Renderer *renderer)
         }
         SDL_RenderCopy(renderer, IMG_LoadTexture(renderer, create_conf_pic_addr().c_str()), NULL, new SDL_Rect{bounds.x - 20, bounds.y - 100, head_rect.w + 40, 100});
     }
-    
+
     if (bounds.x < 0)
     {
         bounds.x = 1;
@@ -921,8 +923,6 @@ void Character::render(SDL_Renderer *renderer)
     }
     power_percent += 1;
 }
-
-
 
 typedef struct ProgressBar
 {
@@ -1099,18 +1099,9 @@ public:
 } TextBox;
 void TextBox::read_keys_and_mouse()
 {
-    int x = 0, y = 0;
-
-    if (SDL_GetMouseState(&x, &y) & SDL_BUTTON_LMASK)
+    if (mouse_state & SDL_BUTTON_LMASK)
     {
-        if (SDL_PointInRect(new SDL_Point{x, y}, &bounds))
-        {
-            enabled = true;
-        }
-        else
-        {
-            enabled = false;
-        }
+        enabled = SDL_PointInRect(&mouse_coordinates, &bounds);
     }
 
     if (enabled)
@@ -1192,7 +1183,7 @@ public:
         text.ptsize = size;
         text.update_font();
     }
-    bool is_clicked();
+    bool is_clicked(bool b_while);
     void set_text(string text) { this->text.text = text; }
     void render(SDL_Renderer *renderer, SDL_Texture *dst = NULL, SDL_Rect *srcrect = NULL);
     void play_click() { play_short_sounds(click_mus); }
@@ -1267,23 +1258,23 @@ Button::Button(SDL_Renderer *p_renderer, std::string back_addr, SDL_Rect bounds)
     this->bounds.w = bounds.w;
     this->bounds.h = bounds.h;
 }
-bool Button::is_clicked()
+bool Button::is_clicked(bool b_while = false)
 {
-    Uint32 state;
-    int x = 0, y = 0;
-    state = SDL_GetMouseState(&x, &y);
-    SDL_PumpEvents();
-    return ((SDL_PointInRect(new SDL_Point{x, y}, &bounds) && (state & SDL_BUTTON_LMASK)));
+    if (b_while)
+    {
+        mouse_state = SDL_GetMouseState(&mouse_coordinates.x, &mouse_coordinates.y);
+        SDL_PumpEvents();
+    }
+
+    return ((SDL_PointInRect(&mouse_coordinates, &bounds) && (mouse_state & SDL_BUTTON_LMASK)));
 }
 void Button::render(SDL_Renderer *renderer, SDL_Texture *dst, SDL_Rect *srcrect)
 {
-    int x = 0, y = 0;
-    SDL_GetMouseState(&x, &y);
     SDL_Texture *former_texture = SDL_GetRenderTarget(renderer);
     SDL_SetRenderTarget(renderer, NULL);
     SDL_RenderCopy(renderer, back_texture, srcrect, &bounds);
 
-    if (SDL_PointInRect(new SDL_Point{x, y}, &bounds))
+    if (SDL_PointInRect(&mouse_coordinates, &bounds))
     {
         SDL_SetRenderDrawColor(renderer, 250, 100, 0, 255);
         SDL_RenderDrawRect(renderer, &bounds);
@@ -1312,13 +1303,25 @@ void clear_window(SDL_Renderer *m_renderer)
     SDL_SetRenderDrawColor(m_renderer, back_color.r, back_color.g, back_color.b, 255);
     SDL_RenderClear(m_renderer);
 }
-void window_stuff(SDL_Renderer *m_renderer, SDL_Event *e)
+void window_stuff(SDL_Renderer *m_renderer, SDL_Event *e, SDL_Window *win_main)
 {
-    SDL_PollEvent(e);
-    if (e->type == SDL_QUIT)
+    if (SDL_PollEvent(e))
     {
-        Game_State = STATE_QUIT;
+        switch ((*e).type)
+        {
+        case SDL_QUIT:
+            Game_State = STATE_QUIT;
+            break;
+        case SDL_KEYDOWN:
+            if ((*e).key.keysym.sym == 'q')
+            {
+                Game_State = STATE_QUIT;
+            }
+            break;
+        }
+        mouse_state = SDL_GetMouseState(&mouse_coordinates.x, &mouse_coordinates.y);
     }
+
     SDL_SetRenderTarget(m_renderer, NULL);
     SDL_RenderPresent(m_renderer);
     SDL_Delay(DELAY);
@@ -1331,6 +1334,7 @@ int main(int argc, char *argv[])
     // Initialization of SDL window
     {
         Uint32 SDL_flags = SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO;
+        // Uint32 WND_flags = SDL_WINDOW_RESIZABLE;
         Uint32 WND_flags = SDL_WINDOW_HIDDEN;
         int result = Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
         if (SDL_Init(SDL_flags) < 0 || TTF_Init() < 0 || IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG) == 0 || Mix_Init(MIX_INIT_MP3) == 0 || result != 0)
@@ -1376,7 +1380,7 @@ int main(int argc, char *argv[])
     //-----====-Main game loop start-====-----
     while (1)
     {
-        window_stuff(m_renderer, e);
+        window_stuff(m_renderer, e, m_window);
         l_char.set_goals(0);
         r_char.set_goals(0);
         r_char.set_x(WIDTH - 200 - 100);
@@ -1409,7 +1413,7 @@ int main(int argc, char *argv[])
 
                 if (quit.is_clicked())
                 {
-                    while (quit.is_clicked())
+                    while (quit.is_clicked(true))
                     {
                     }
                     quit.play_click();
@@ -1417,7 +1421,7 @@ int main(int argc, char *argv[])
                 }
                 if (setting.is_clicked())
                 {
-                    while (setting.is_clicked())
+                    while (setting.is_clicked(true))
                     {
                     }
                     setting.play_click();
@@ -1425,13 +1429,13 @@ int main(int argc, char *argv[])
                 }
                 if (start.is_clicked())
                 {
-                    while (start.is_clicked())
+                    while (start.is_clicked(true))
                     {
                     }
                     start.play_click();
                     Game_State = STATE_GET_NAMES;
                 }
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
         }
         if (Game_State == STATE_SETTING)
@@ -1488,7 +1492,7 @@ int main(int argc, char *argv[])
 
                 if (btn_dec_rad.is_clicked())
                 {
-                    while (btn_dec_rad.is_clicked())
+                    while (btn_dec_rad.is_clicked(true))
                         ;
                     btn_dec_rad.play_click();
                     if (ball.get_r() > 20)
@@ -1497,7 +1501,7 @@ int main(int argc, char *argv[])
 
                 if (btn_inc_rad.is_clicked())
                 {
-                    while (btn_inc_rad.is_clicked())
+                    while (btn_inc_rad.is_clicked(true))
                         ;
                     btn_dec_rad.play_click();
                     if (ball.get_r() < 60)
@@ -1506,7 +1510,7 @@ int main(int argc, char *argv[])
 
                 if (btn_dec_r.is_clicked())
                 {
-                    while (btn_dec_r.is_clicked())
+                    while (btn_dec_r.is_clicked(true))
                     {
                     }
                     btn_dec_r.play_click();
@@ -1516,7 +1520,7 @@ int main(int argc, char *argv[])
 
                 if (btn_inc_r.is_clicked())
                 {
-                    while (btn_inc_r.is_clicked())
+                    while (btn_inc_r.is_clicked(true))
                     {
                     }
                     btn_inc_r.play_click();
@@ -1526,7 +1530,7 @@ int main(int argc, char *argv[])
 
                 if (btn_dec_g.is_clicked())
                 {
-                    while (btn_dec_g.is_clicked())
+                    while (btn_dec_g.is_clicked(true))
                     {
                     }
                     btn_dec_g.play_click();
@@ -1536,7 +1540,7 @@ int main(int argc, char *argv[])
 
                 if (btn_inc_g.is_clicked())
                 {
-                    while (btn_inc_g.is_clicked())
+                    while (btn_inc_g.is_clicked(true))
                     {
                     }
                     btn_inc_g.play_click();
@@ -1546,7 +1550,7 @@ int main(int argc, char *argv[])
 
                 if (btn_dec_b.is_clicked())
                 {
-                    while (btn_dec_b.is_clicked())
+                    while (btn_dec_b.is_clicked(true))
                     {
                     }
                     btn_dec_b.play_click();
@@ -1556,7 +1560,7 @@ int main(int argc, char *argv[])
 
                 if (btn_inc_b.is_clicked())
                 {
-                    while (btn_inc_b.is_clicked())
+                    while (btn_inc_b.is_clicked(true))
                     {
                     }
                     btn_inc_b.play_click();
@@ -1566,14 +1570,14 @@ int main(int argc, char *argv[])
 
                 if (btn_return.is_clicked())
                 {
-                    while (btn_return.is_clicked())
+                    while (btn_return.is_clicked(true))
                     {
                     }
                     btn_return.play_click();
                     Game_State = STATE_START_MENU;
                 }
 
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
         }
         if (Game_State == STATE_GET_NAMES)
@@ -1598,7 +1602,7 @@ int main(int argc, char *argv[])
                 {
                     if (btn_next.is_clicked())
                     {
-                        while (btn_next.is_clicked())
+                        while (btn_next.is_clicked(true))
                         {
                         }
                         btn_next.play_click();
@@ -1612,7 +1616,7 @@ int main(int argc, char *argv[])
                 {
                     render_text_center(m_renderer, "Names should be diffrent and non empty!", new SDL_Point{WIDTH / 2, HEIGHT / 2}, names_font, {200, 50, 50, 255});
                 }
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
         }
         if (Game_State == STATE_SELECT_BALL)
@@ -1643,7 +1647,7 @@ int main(int argc, char *argv[])
 
                 if (next.is_clicked())
                 {
-                    while (next.is_clicked())
+                    while (next.is_clicked(true))
                     {
                     }
                     next.play_click();
@@ -1655,7 +1659,7 @@ int main(int argc, char *argv[])
                 }
                 if (pervious.is_clicked())
                 {
-                    while (pervious.is_clicked())
+                    while (pervious.is_clicked(true))
                     {
                     }
                     pervious.play_click();
@@ -1668,7 +1672,7 @@ int main(int argc, char *argv[])
 
                 if (next_level.is_clicked())
                 {
-                    while (next_level.is_clicked())
+                    while (next_level.is_clicked(true))
                     {
                     }
                     next_level.play_click();
@@ -1676,7 +1680,7 @@ int main(int argc, char *argv[])
                     Game_State = STATE_SELECT_CHAR;
                 }
 
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
         }
         if (Game_State == STATE_SELECT_CHAR)
@@ -1714,7 +1718,7 @@ int main(int argc, char *argv[])
 
                 if (l_h_i.is_clicked())
                 {
-                    while (l_h_i.is_clicked())
+                    while (l_h_i.is_clicked(true))
                         ;
                     l_h_i.play_click();
                     l_head_model += 2;
@@ -1727,7 +1731,7 @@ int main(int argc, char *argv[])
 
                 if (l_h_d.is_clicked())
                 {
-                    while (l_h_d.is_clicked())
+                    while (l_h_d.is_clicked(true))
                         ;
                     l_h_d.play_click();
                     l_head_model -= 2;
@@ -1740,7 +1744,7 @@ int main(int argc, char *argv[])
 
                 if (r_h_i.is_clicked())
                 {
-                    while (r_h_i.is_clicked())
+                    while (r_h_i.is_clicked(true))
                         ;
                     r_h_i.play_click();
                     r_head_model += 2;
@@ -1753,7 +1757,7 @@ int main(int argc, char *argv[])
 
                 if (r_h_d.is_clicked())
                 {
-                    while (r_h_d.is_clicked())
+                    while (r_h_d.is_clicked(true))
                         ;
                     r_h_d.play_click();
                     r_head_model -= 2;
@@ -1766,14 +1770,14 @@ int main(int argc, char *argv[])
 
                 if (next_level.is_clicked())
                 {
-                    while (next_level.is_clicked())
+                    while (next_level.is_clicked(true))
                     {
                     }
                     next_level.play_click();
                     Game_State = STATE_GAMING;
                 }
 
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
         }
         if (Game_State == STATE_GAMING)
@@ -1875,7 +1879,7 @@ int main(int argc, char *argv[])
 
                     if (btn_quit.is_clicked())
                     {
-                        while (btn_quit.is_clicked())
+                        while (btn_quit.is_clicked(true))
                         {
                         }
                         btn_quit.play_click();
@@ -1884,7 +1888,7 @@ int main(int argc, char *argv[])
 
                     if (btn_main_menu.is_clicked())
                     {
-                        while (btn_main_menu.is_clicked())
+                        while (btn_main_menu.is_clicked(true))
                             ;
                         btn_main_menu.play_click();
                         r_char.set_mode(r_p);
@@ -1896,7 +1900,7 @@ int main(int argc, char *argv[])
 
                     if (btn_resume.is_clicked())
                     {
-                        while (btn_resume.is_clicked())
+                        while (btn_resume.is_clicked(true))
                             ;
                         btn_resume.play_click();
                         r_char.set_mode(r_p);
@@ -1984,7 +1988,7 @@ int main(int argc, char *argv[])
                     Game_State = STATE_END_MENU;
                 }
 
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
             SDL_DestroyTexture(goal_l);
             SDL_DestroyTexture(goal_r);
@@ -2014,14 +2018,14 @@ int main(int argc, char *argv[])
 
                 if (main_btn.is_clicked())
                 {
-                    while (main_btn.is_clicked())
+                    while (main_btn.is_clicked(true))
                         ;
                     main_btn.play_click();
                     Game_State = STATE_START_MENU;
                 }
                 if (replay_btn.is_clicked())
                 {
-                    while (replay_btn.is_clicked())
+                    while (replay_btn.is_clicked(true))
                         ;
                     replay_btn.play_click();
                     l_char.set_goals(0);
@@ -2030,13 +2034,13 @@ int main(int argc, char *argv[])
                 }
                 if (quit_btn.is_clicked())
                 {
-                    while (quit_btn.is_clicked())
+                    while (quit_btn.is_clicked(true))
                         ;
                     quit_btn.play_click();
                     Game_State = STATE_QUIT;
                 }
 
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
         }
         if (Game_State == STATE_QUIT)
@@ -2053,7 +2057,7 @@ int main(int argc, char *argv[])
                 {
                     break;
                 }
-                window_stuff(m_renderer, e);
+                window_stuff(m_renderer, e, m_window);
             }
             if (time.check_alarm())
             {
