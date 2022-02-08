@@ -477,7 +477,7 @@ private:
     float shoes_to_height_ratio = 0.25;
 
     const int x_speed = 20;
-    const int y_speed = 75;
+    const int y_speed = 85;
 
     int dx = 0, dy = 0, dvy = 0;
     int keys[4] = {SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN};
