@@ -1,5 +1,5 @@
 # SDL-minigame
-head football. The university final project:)
+head football. The Sharif university BP (language:c++) course of EE department final project.
 
 ## Installation
 at first you should install SDL2, SDL2_gfx, SDL2_image, SDL2_ttf.
